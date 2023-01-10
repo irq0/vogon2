@@ -8,7 +8,7 @@ import sys
 import tempfile
 from operator import itemgetter
 
-from ConfigParser import ConfigParser
+import toml
 
 scriptpath = os.path.abspath(os.path.dirname(sys.argv[0]))
 logdir = os.path.join(scriptpath, "logs")
@@ -22,8 +22,8 @@ def die(msg):
 
 class TestCase:
     def __init__(self, filename):
-        config = ConfigParser()
-        config.read(filename)
+        with open(filename) as fd:
+            config = toml.load(fd)
 
         self.returncode = None
 
@@ -74,8 +74,8 @@ class TestCase:
 
                 self.environ[key] = value
 
-        global_config = ConfigParser()
-        global_config.read(os.path.join(scriptpath, "global.conf"))
+        with open(os.path.join(scriptpath, "global.toml")) as fd:
+            global_config = toml.load(fd)
 
         if global_config.has_section("env"):
             for option in global_config.options("env"):
