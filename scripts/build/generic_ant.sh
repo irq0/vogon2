@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
-source $(dirname $0)/../vogon.sh
+source "$(dirname "$0")/../vogon.sh"
 
 (
-    cd $VOGON_TEST_REPOS
+    cd "$VOGON_TEST_REPOS" || exit
 
-    GIT_BRANCH="$(git branch 2>/dev/null | grep '^*' | sed -e 's/\*\ //')"
+    GIT_BRANCH="$(git branch --show-current)"
 
     if [ -n "$GIT_BRANCH" ]; then
         vogon_result "git-branch" "$GIT_BRANCH" " "
