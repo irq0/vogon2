@@ -1,0 +1,2 @@
+load listdirs
+set $nthreads=1

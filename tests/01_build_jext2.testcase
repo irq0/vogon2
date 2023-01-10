@@ -1,0 +1,17 @@
+[meta]
+name: Build jext2
+description: Run ant clean dist in jext2 repository
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/build/generic_ant.sh
+
+[env]
+REPOS: $HOME/jext2
+
+[pass]
+condition: string-match
+value: BUILD SUCCESSFUL
+

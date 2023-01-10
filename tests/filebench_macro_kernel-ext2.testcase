@@ -1,0 +1,22 @@
+[meta]
+ident: filebench_macro_kernel-ext2
+name: Filebench: Sequential Write linux ext2
+description: Filebench 
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/filebench_multi.sh
+testenv: scripts/environment/kernel-ext2.sh
+
+[env]
+MOUNT: sudo /bin/mount -o noatime,noacl,oldalloc
+UMOUNT: sudo -i /bin/umount
+PERSONALITIES: webserver fileserver varmail
+SLEEP: 60
+
+[pass]
+condition: returncode
+value: 0
+

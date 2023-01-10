@@ -1,0 +1,6 @@
+load filemicro_delete
+set $count=10000
+set $filesize=16k
+set $nfiles=5000
+set $meandirwidth=100
+set $nthreads=1

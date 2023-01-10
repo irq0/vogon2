@@ -1,0 +1,4 @@
+load removedirs
+set $nthreads=1
+set $ndirs=10000
+set $meandirwidth=100

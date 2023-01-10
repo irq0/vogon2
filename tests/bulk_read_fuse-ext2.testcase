@@ -1,0 +1,20 @@
+[meta]
+name: fuse-ext2 read performance test 10G
+description: Create fresh filesystem and sequentially read file to /dev/null. Use fuse-ext2
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/bulk_read_speed_generic.sh
+testenv: scripts/environment/fuse-ext2.sh
+
+[env]
+FILESIZE: 10000
+MOUNT: $HOME/fuse-ext2/current-version/fuse-ext2/fuse-ext2 
+BINARY: $HOME/fuse-ext2/current-version/fuse-ext2/fuse-ext2 
+UMOUNT: fusermount -u 
+
+[pass]
+condition: returncode
+value: 0

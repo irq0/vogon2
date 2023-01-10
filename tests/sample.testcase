@@ -1,0 +1,10 @@
+[meta]
+name: Sample Testcase
+description: Testcase to show the potential of outwird :)
+
+[require]
+root: yes
+tempdir: yes
+
+[run]
+script: scripts/sample.sh

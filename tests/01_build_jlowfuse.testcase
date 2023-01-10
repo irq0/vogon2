@@ -1,0 +1,17 @@
+[meta]
+name: Build jlowfuse
+description: Run ant clean dist in jlowfuse repository
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/build/generic_ant.sh
+
+[env]
+REPOS: $HOME/jlowfuse
+
+[pass]
+condition: string-match
+value: BUILD SUCCESSFUL
+

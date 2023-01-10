@@ -1,0 +1,4 @@
+load createfiles
+set $nthreads=1
+set $nfiles=1000
+set $meandirwidth=0

@@ -1,0 +1,21 @@
+[meta]
+name: Kernel ext2 read performance test 10G
+description: Create fresh filesystem and sequentially read file to /dev/null. Use linux ext2
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/bulk_read_speed_generic.sh
+testenv: scripts/environment/ext2fuse.sh
+
+[env]
+FILESIZE: 10000
+MOUNT: nohup $HOME/ext2fuse/ext2fuse-0.7/ext2fuse
+UMOUNT: fusermount -u
+JAVA: false
+BINARY: $HOME/ext2fuse/ext2fuse-0.7/ext2fuse
+
+[pass]
+condition: returncode
+value: 0

@@ -1,0 +1,20 @@
+[meta]
+name: Kernel ext2 read performance test 10G
+description: Create fresh filesystem and sequentially read file to /dev/null. Use linux ext2
+
+[require]
+tempdir: yes
+
+[run]
+script: scripts/bulk_read_speed_generic.sh
+testenv: scripts/environment/kernel-ext2.sh
+
+[env]
+FILESIZE: 10000
+MOUNT: sudo /bin/mount -o noatime,noacl,oldalloc
+UMOUNT: sudo -i /bin/umount
+JAVA: false
+
+[pass]
+condition: returncode
+value: 0

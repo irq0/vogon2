@@ -1,0 +1,3 @@
+load filemicro_seqread
+set $iosize = 32k
+set $filesize = 1g
