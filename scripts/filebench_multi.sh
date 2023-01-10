@@ -34,10 +34,10 @@ for bench in $VOGON_TEST_PERSONALITIES; do
     ) &
 
     sleep 10
-    
-    # this blocks until filesystem is accessable 
-    ( 
-	cd $mountpoint 
+
+    # this blocks until filesystem is accessable
+    (
+	cd $mountpoint
 	mkdir $mountpoint/filebench_${ident}_${bench}/
     )
 
@@ -49,7 +49,7 @@ for bench in $VOGON_TEST_PERSONALITIES; do
     if [ -z "$fs_pid" ]; then
         fs_pid=$(pgrep -f ${VOGON_BLOCKDEV})
     fi
-	    
+
 #    echo "prepare filebench:"
 #    # run filebench
 #    (
@@ -71,12 +71,12 @@ for bench in $VOGON_TEST_PERSONALITIES; do
 	( pidstat -u -p $fs_pid 1 > ${logdir}/pidstat_cpu_$bench ) &
 	( pidstat -r -p $fs_pid 1 > ${logdir}/pidstat_mem_$bench ) &
     fi
-    
+
     echo "start sar:"
     ( sar -u 1 > ${logdir}/cpu_util_$bench ) &
 
     echo "drop caches:"
-    vogon_drop_caches    
+    vogon_drop_caches
 
     echo "run filebench:"
     (
@@ -94,10 +94,10 @@ shutdown processes
 quit
 EOF
     )
-    
+
     echo "sync, stop blktrace, pidstat:"
     sync
-    
+
     sudo pkill "$(basename $VOGON_BLKTRACE)"
     mv $blktracetmp $blktracefile
 
@@ -109,7 +109,7 @@ EOF
     (
 	$($VOGON_TEST_UMOUNT $mountpoint)
     )
-    
+
     echo "extract data:"
     # extract data
     sum="$(tail -1 ${dumpfile}_${bench} | tr -d , )"
@@ -119,7 +119,7 @@ EOF
     vogon_result "${bench}(r/w ratio)" $(echo $sum | awk ' {print $7, $8}')
     vogon_result "${bench}(throughput)" $(echo $sum | awk ' {print $9}' | tr -d 'mb/s') "mb/s"
     vogon_result "${bench}(cpu-per-op)" $(echo $sum | awk ' {print $10}' | tr -d 'uscpu/op') "uscpu/op"
-    
+
     wait
 done
 

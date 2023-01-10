@@ -18,8 +18,8 @@ mkdir $mountpoint
 
 sleep 10
 
-( 
-    cd $mountpoint 
+(
+    cd $mountpoint
     mkdir $mountpoint/filebench_${ident}/
 )
 
@@ -56,4 +56,3 @@ vogon_result "throughput" $(echo $sum | awk ' {print $9}' | tr -d 'mb/s') "mb/s"
 vogon_result "cpu-per-op" $(echo $sum | awk ' {print $10}' | tr -d 'uscpu/op') "uscpu/op"
 
 exit $?
-

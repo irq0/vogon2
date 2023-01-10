@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import sys
-import run
 import logging
 import sqlite3
+import sys
+
+import run
 
 mail_from = "vogon@irq0.org"
 mail_to = ["ml@irq0.org"]
@@ -34,7 +33,7 @@ def main():
     overview = []
 
     for test in tests:
-        logging.info("== STARTING REPORT %s - %s ==" % (test.identifier, test.name))
+        logging.info(f"== STARTING REPORT {test.identifier} - {test.name} ==")
         logging.info(test.description)
 
         dbconn = sqlite3.connect(test.dbfile)
@@ -50,12 +49,12 @@ def main():
             continue
 
         overview.append(
-            "{0:30} \t [{1}]".format(test.name, ["FAILED", "PASSED"][result[0][3]])
+            "{:30} \t [{}]".format(test.name, ["FAILED", "PASSED"][result[0][3]])
         )
 
         text.append("\n")
         text.append(
-            "===== {0:60} =====".format(
+            "===== {:60} =====".format(
                 test.name,
             )
         )
@@ -67,14 +66,14 @@ def main():
         text.append(test.description)
 
         text.append("")
-        text.append("{0:20} {1:20} {2:20}".format("Key", "Value", "Unit"))
+        text.append("{:20} {:20} {:20}".format("Key", "Value", "Unit"))
         for row in result:
-            text.append("{0:20} {1:20} {2:20}".format(row[4], row[5], row[6]))
+            text.append(f"{row[4]:20} {row[5]:20} {row[6]:20}")
 
         dbconn.close()
 
         logging.debug(test.dbfile)
-        logging.info("== FINISHED REPORT %s - %s ==" % (test.identifier, test.name))
+        logging.info(f"== FINISHED REPORT {test.identifier} - {test.name} ==")
 
     mail_report(
         "\n".join(

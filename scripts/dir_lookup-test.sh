@@ -17,7 +17,7 @@ echo ":D" > $mountpoint/look_me_up
 
 sudo -i umount $mountpoint
 
-## mount and test different implementations 
+## mount and test different implementations
 
 # kernel +dir_hash
 vogon_drop_caches

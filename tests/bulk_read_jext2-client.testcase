@@ -1,6 +1,6 @@
 [meta]
 name: JEXT2(client) read performance test 10G
-description: Create fresh filesystem and sequentially read file to /dev/null. Use jext2 with client jvm 
+description: Create fresh filesystem and sequentially read file to /dev/null. Use jext2 with client jvm
 
 [require]
 tempdir: yes

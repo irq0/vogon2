@@ -1,7 +1,7 @@
 [meta]
 ident: filebench_macro_jext2-server
 name: Filebench: MACRO Workloads - jext2 server
-description: Filebench 
+description: Filebench
 
 [require]
 tempdir: yes

@@ -14,4 +14,3 @@ REPOS: $HOME/jlowfuse
 [pass]
 condition: string-match
 value: BUILD SUCCESSFUL
-

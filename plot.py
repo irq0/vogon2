@@ -1,17 +1,12 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 # äüö
-
-
-from pprint import pprint
-from pysqlite2 import dbapi2 as sqlite3
-from operator import itemgetter
-
-from pylab import *
-
 import os.path
 import tempfile
+from operator import itemgetter
+from pprint import pprint
+
 import Gnuplot
+from pysqlite2 import dbapi2 as sqlite3
 
 
 # dbs = ["filebench_micro_ext2fuse.sqlite",
@@ -47,7 +42,7 @@ def get_results(databases):
         for row in cur:
             key = row["key"]
 
-            if not results.has_key(key):
+            if key not in results:
                 results[key] = {}
             else:
                 results[key][db] = (

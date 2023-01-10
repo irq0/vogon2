@@ -1,7 +1,7 @@
 [meta]
 ident: filebench_micro_jext2-server
 name: Filebench: Sequential Write - One Thread - jext2 server
-description: Filebench 
+description: Filebench
 
 [require]
 tempdir: yes

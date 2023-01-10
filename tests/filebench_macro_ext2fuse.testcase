@@ -1,7 +1,7 @@
 [meta]
 ident: filebench_macro_ext2fuse
 name: Filebench: MACRO Workloads - ext2fuse
-description: Filebench 
+description: Filebench
 
 [require]
 tempdir: yes

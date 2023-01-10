@@ -1,7 +1,7 @@
 [meta]
 ident: filebench_macro_kernel-ext2
 name: Filebench: Sequential Write linux ext2
-description: Filebench 
+description: Filebench
 
 [require]
 tempdir: yes
@@ -19,4 +19,3 @@ SLEEP: 60
 [pass]
 condition: returncode
 value: 0
-

@@ -1,15 +1,13 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-import os
-import sys
-import subprocess
-import tempfile
-import sqlite3
-import shutil
+#!/usr/bin/env python3
 import logging
-
+import os
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
 from operator import itemgetter
+
 from ConfigParser import ConfigParser
 
 scriptpath = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -69,7 +67,7 @@ class TestCase:
 
         if config.has_section("env"):
             for option in config.options("env"):
-                key = "VOGON_TEST_%s" % (option.upper(),)
+                key = f"VOGON_TEST_{option.upper()}"
                 value = config.get("env", option)
 
                 value = value.replace("$HOME", os.environ["HOME"])
@@ -81,7 +79,7 @@ class TestCase:
 
         if global_config.has_section("env"):
             for option in global_config.options("env"):
-                key = "VOGON_%s" % (option.upper(),)
+                key = f"VOGON_{option.upper()}"
                 value = global_config.get("env", option)
                 value = value.replace("$HOME", os.environ["HOME"])
 
@@ -94,7 +92,8 @@ class TestCase:
             if condition == "returncode":
                 self.passed = lambda: (self.returncode == int(value))
             elif condition == "string-match":
-                # fixme                self.passed = lambda : (value in self.stdout or value in self.stderr)
+                # FIXME
+                # self.passed = lambda : (value in self.stdout or value in self.stderr)
                 self.passed = True
             else:
                 die(".testcase: Condition %s unknown" % condition)
@@ -200,7 +199,7 @@ class TestCase:
         env["libc_name"] = libc[0]
         env["libc_version"] = libc[1]
 
-        with open("/proc/meminfo", "r") as file:
+        with open("/proc/meminfo") as file:
             for line in file:
                 key, value = line.split(":")
                 if key in ("MemTotal", "SwapTotal"):
@@ -337,8 +336,7 @@ class TestCase:
 
         if self.testenv_script is not None:
             with tempfile.TemporaryFile() as file:
-                run_command_output_to_file(
-                    self.environ, self.testenv_script, file)
+                run_command_output_to_file(self.environ, self.testenv_script, file)
                 self.save_test_environment_from_stdout(file)
 
         # Run the tests
@@ -394,7 +392,7 @@ def run_command_output_to_file(environ, command, file):
         proc.communicate()
         return proc.returncode
     except OSError as e:
-        die("run_command: %s -> %s" % (command, e))
+        die(f"run_command: {command} -> {e}")
 
 
 def add_test_environment_value(cur, testrun_id, key, value):
@@ -483,16 +481,16 @@ def main():
         die("No tests found :(")
 
     for test in tests:
-        logging.info("== STARTING TEST %s - %s ==" % (test.identifier, test.name))
-        logging.info("== DOING %s RUNS ==" % (runs,))
+        logging.info(f"== STARTING TEST {test.identifier} - {test.name} ==")
+        logging.info(f"== DOING {runs} RUNS ==")
         logging.info(test.description)
 
         ret = test.run(runs)
         logging.debug("-- LAST LOG --")
-        logging.debug(open(test.logfilename, "r").read())
+        logging.debug(open(test.logfilename).read())
 
         logging.info("returncode: " + str(ret))
-        logging.info("== FINISHED TEST %s - %s ==" % (test.identifier, test.name))
+        logging.info(f"== FINISHED TEST {test.identifier} - {test.name} ==")
 
 
 if __name__ == "__main__":

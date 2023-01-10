@@ -10,8 +10,8 @@ mkdir $mountpoint
 
 (
 	cd testfiles
-	
-	for i in $(seq 1 $VOGON_TEST_RANDFILES); do 
+
+	for i in $(seq 1 $VOGON_TEST_RANDFILES); do
         echo $i
 		dd if=/dev/urandom of=randfile_$i bs=1M count=$((2 * $i))
 	done
@@ -38,7 +38,7 @@ sudo -i umount $mountpoint
 
 vogon_drop_caches
 $VOGON_JEXT2 $VOGON_BLOCKDEV $mountpoint
-#shasum -a 256 --check $correct_sums $mountpoint/testfiles/* 
+#shasum -a 256 --check $correct_sums $mountpoint/testfiles/*
 vogon_shasum256_check "jext2" $correct_sums $mountpoint/testfiles/*
 sudo -i umount $mountpoint
 return=$?
