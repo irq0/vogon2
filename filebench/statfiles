@@ -1,5 +1,0 @@
-load filemicro_statfile
-set $nfiles=10000
-set $meandirwidth=100
-set $filesize=128k
-set $nthreads=1

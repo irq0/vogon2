@@ -1,3 +1,0 @@
-load filemicro_create
-set $count = 1048576
-set $iosize = 4k

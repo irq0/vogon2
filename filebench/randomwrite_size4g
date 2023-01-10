@@ -1,4 +1,0 @@
-load filemicro_rwrite
-set $filesize=4g
-set $bytes=128m
-set $iosize=4k

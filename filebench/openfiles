@@ -1,3 +1,0 @@
-load openfiles
-set $nthreads=1
-set $nfiles=15000

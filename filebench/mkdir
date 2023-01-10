@@ -1,4 +1,0 @@
-load makedirs
-set $nthreads=1
-set $dirwidth=100
-set $ndirs=10000
