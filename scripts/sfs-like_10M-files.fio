@@ -1,0 +1,16 @@
+[global]
+name=sfs-like_10M
+time_based
+runtime=60
+
+[sfs-obj-alike]
+rw=randrw
+rwmixread=70
+rwmixwrite=30
+direct=0
+size=10M
+ioengine=libaio
+bs=10M
+direct=0
+end_fsync=1
+numjobs=20
