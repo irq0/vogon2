@@ -1,0 +1,4 @@
+click
+cpuinfo
+docker
+sqlite3

@@ -1,7 +1,0 @@
-[env]
-S3GW_BIN = "/compile/s3gw/build/bin/radosgw"
-SFS_DIR = "/compile/tmp"
-SFS_BLOCKDEV = "/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_1TB_S5GXNF0R777486K"
-
-[run]
-program_under_test = "scripts/run-s3gw.sh"
