@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
+import io
 import logging
 import os
+import pathlib
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
-from operator import itemgetter
 
 import toml
 
 scriptpath = os.path.abspath(os.path.dirname(sys.argv[0]))
-logdir = os.path.join(scriptpath, "logs")
+LOGDIR = os.path.join(scriptpath, "logs")
 logfilename = os.path.join(scriptpath, "run.log")
 
 
@@ -24,32 +25,23 @@ class TestCase:
     def __init__(self, filename):
         with open(filename) as fd:
             config = toml.load(fd)
+        with open(os.path.join(scriptpath, "global.toml")) as fd:
+            global_config = toml.load(fd)
 
         self.returncode = None
+        self.identifier = os.path.basename(filename)
+        self.name = config["test"]["name"]
 
-        self.identifier = config.get("meta", "ident")
-        self.name = config.get("meta", "name")
-        self.description = config.get("meta", "description")
+        self.requirements = config["test"]["requirements"]
+        self.test_script = os.path.join(scriptpath, config["run"]["test_script"])
+        self.program_under_test = global_config["run"]["program_under_test"]
 
-        self.logfilename = os.path.join(logdir, self.identifier + ".log")
-
-        self.requirements = map(
-            itemgetter(0), filter(lambda x: x[1] == "yes", config.items("require"))
-        )
-
-        self.script = os.path.join(scriptpath, config.get("run", "script"))
-
-        if config.has_option("run", "testenv"):
-            self.testenv_script = os.path.join(scriptpath, config.get("run", "testenv"))
+        if "testenv" in config["run"]:
+            self.testenv_script = os.path.join(scriptpath, config["run"]["testenv"])
         else:
             self.testenv_script = None
 
-        if config.has_option("run", "args"):
-            self.args = config.get("run", "args").split(" ")
-        else:
-            self.args = []
-
-        self.dbfile = os.path.join(scriptpath, "results", "%s.sqlite" % self.identifier)
+        self.dbfile = os.path.join(scriptpath, "results", f"{self.identifier}.sqlite")
 
         if not os.path.exists(self.dbfile):
             self.init_db()
@@ -57,44 +49,35 @@ class TestCase:
         self.dbconn = sqlite3.connect(self.dbfile)
         self.test_id = self.fetch_test_id()
 
+        self.logdir_test = pathlib.Path(LOGDIR, self.identifier, str(self.test_id))
+        self.logdir_test.mkdir(parents=True)
+
         self.environ = {
             "VOGON_TEST_ID": str(self.test_id),
             "VOGON_DATABASE": str(self.dbfile),
-            "VOGON_LOGDIR": str(logdir),
+            "VOGON_TEST_LOGDIR": str(self.logdir_test),
             "VOGON_IDENT": str(self.identifier),
             "HOME": os.environ["HOME"],
         }
 
-        if config.has_section("env"):
-            for option in config.options("env"):
-                key = f"VOGON_TEST_{option.upper()}"
-                value = config.get("env", option)
-
+        if "env" in config:
+            for env_key, value in config["env"].items():
+                env = f"VOGON_TEST_{env_key.upper()}"
                 value = value.replace("$HOME", os.environ["HOME"])
+                self.environ[env] = value
 
-                self.environ[key] = value
-
-        with open(os.path.join(scriptpath, "global.toml")) as fd:
-            global_config = toml.load(fd)
-
-        if global_config.has_section("env"):
-            for option in global_config.options("env"):
-                key = f"VOGON_{option.upper()}"
-                value = global_config.get("env", option)
+        if "env" in global_config:
+            for env_key, value in global_config["env"].items():
+                env = f"VOGON_{env_key.upper()}"
                 value = value.replace("$HOME", os.environ["HOME"])
+                self.environ[env] = value
 
-                self.environ[key] = value
-
-        if config.has_section("pass"):
-            condition = config.get("pass", "condition")
-            value = config.get("pass", "value")
+        if "pass" in config:
+            condition = config["pass"]["condition"]
+            value = config["pass"]["value"]
 
             if condition == "returncode":
                 self.passed = lambda: (self.returncode == int(value))
-            elif condition == "string-match":
-                # FIXME
-                # self.passed = lambda : (value in self.stdout or value in self.stderr)
-                self.passed = True
             else:
                 die(".testcase: Condition %s unknown" % condition)
         else:
@@ -113,6 +96,7 @@ class TestCase:
                         start timestamp,
                         finished timestamp,
                         identifier text,
+                        name text,
                         require text,
                         runs integer);
                     """
@@ -190,10 +174,9 @@ class TestCase:
         env["os_version"] = platform.version()
         env["node_name"] = platform.node()
 
-        dist = platform.linux_distribution()
-        env["dist_name"] = dist[0]
-        env["dist_version"] = dist[1]
-        env["dist_id"] = dist[2]
+        dist = platform.freedesktop_os_release()
+        env["dist_name"] = dist["NAME"]
+        env["dist_version"] = dist["VERSION_ID"]
 
         libc = platform.libc_ver()
         env["libc_name"] = libc[0]
@@ -203,7 +186,9 @@ class TestCase:
             for line in file:
                 key, value = line.split(":")
                 if key in ("MemTotal", "SwapTotal"):
-                    env[key.strip().lower()] = value.strip()
+                    env[key.strip().lower() + "kb"] = (
+                        value.strip().replace("kB", "").strip()
+                    )
 
         cur = self.dbconn.cursor()
 
@@ -213,20 +198,19 @@ class TestCase:
         self.dbconn.commit()
         cur.close()
 
-    def save_test_environment_from_stdout(self, file):
+    def save_test_environment_from_file(self, file):
+        file.seek(0)
         env = {}
-        if file is not None:
-            file.seek(0)
-            for line in file:
-                if not line.startswith("VOGON_TEST_ENVIRONMENT:"):
-                    continue
-                line = line[len("VOGON_TEST_ENVIRONMENT:") :]
+        for line in file:
+            if not line.startswith(b"VOGON_TEST_ENVIRONMENT:"):
+                continue
+            line = line[len("VOGON_TEST_ENVIRONMENT:") :]
 
-                try:
-                    key, value = line.split(";")
-                    env[key] = value
-                except ValueError:
-                    pass
+            try:
+                key, value = line.decode("utf-8").split(";")
+                env[key] = value
+            except ValueError:
+                pass
         cur = self.dbconn.cursor()
 
         for key, value in env.items():
@@ -240,9 +224,9 @@ class TestCase:
         """
         cur = self.dbconn.cursor()
         cur.execute(
-            """insert into test (start, identifier, require, runs)
+            """insert into test (start, identifier, name, require, runs)
                                     values (strftime('%Y-%m-%d %H:%M:%f'), ?, ?, ?);""",
-            (self.identifier, ",".join(self.requirements), self.runs),
+            (self.identifier, self.name, ",".join(self.requirements), self.runs),
         )
         self.dbconn.commit()
         cur.close()
@@ -335,42 +319,83 @@ class TestCase:
         self.save_test_environment_default()
 
         if self.testenv_script is not None:
-            with tempfile.TemporaryFile() as file:
-                run_command_output_to_file(self.environ, self.testenv_script, file)
-                self.save_test_environment_from_stdout(file)
+            proc = subprocess.run(
+                self.testenv_script,
+                check=True,
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+            )
+            sio = io.BytesIO(proc.stdout)
+            self.save_test_environment_from_file(sio)
 
         # Run the tests
         for i in range(self.runs):
-            with open(self.logfilename, "w+") as logfile:
-                logfile.truncate(0)
+            self.testrun_id = self.fetch_testrun_id()
+            self.logdir = self.logdir_test / str(self.testrun_id)
+            self.logdir.mkdir()
+            self.test_logfilename = self.logdir / "test.log"
+            self.prog_under_test_logfilename = self.logdir / "prog_under_test.log"
 
-                self.testrun_id = self.fetch_testrun_id()
+            with open(self.test_logfilename, "w+") as test_logfile, open(
+                self.prog_under_test_logfilename, "w+"
+            ) as prog_logfile:
 
                 self.environ["VOGON_TESTRUN_ID"] = str(self.testrun_id)
+                self.environ["VOGON_TESTRUN_LOGDIR"] = str(self.logdir)
+                self.environ["VOGON_TESTRUN_ARCHIVE"] = str(self.logdir)
 
-                if self.require("root"):
-                    command = ["sudo", "-E"] + [self.script] + self.args
-                else:
-                    command = [self.script] + self.args
-
+                cwd = None
                 if self.require("tempdir"):
-                    tempdir = tempfile.mkdtemp(prefix="vogon_")
-                    os.chdir(tempdir)
+                    cwd = tempfile.mkdtemp(prefix="vogon_")
 
                 self.save_before_testrun()
-                self.returncode = run_command_output_to_file(
-                    self.environ, command, logfile
-                )
-                self.save_after_testrun()
 
-                if i == 1:
-                    self.save_test_environment_from_stdout(logfile)
+                prog = subprocess.Popen(
+                    self.program_under_test,
+                    shell=False,
+                    env=self.environ,
+                    bufsize=1,
+                    cwd=cwd,
+                    universal_newlines=True,
+                    stderr=subprocess.STDOUT,
+                    stdout=prog_logfile,
+                )
+                logging.debug("started prog under test: %s", prog)
+
+                test = subprocess.Popen(
+                    self.test_script,
+                    shell=False,
+                    env=self.environ,
+                    cwd=cwd,
+                    bufsize=1,
+                    universal_newlines=True,
+                    stderr=subprocess.STDOUT,
+                    stdout=test_logfile,
+                )
+                logging.debug("started test script: %s", test)
+
+                logging.debug("waiting for test to finish")
+                test.wait()
+
+                logging.debug("test finished. terminating prog under test")
+                prog.terminate()
+                try:
+                    prog.wait(10)
+                except TimeoutError:
+                    logging.debug("prog failed to terminate. killing")
+                    prog.kill()
+
+                self.returncode = test.returncode
+
+                self.save_after_testrun()
 
                 if self.require("tempdir"):
                     os.chdir(scriptpath)
-                    shutil.rmtree(tempdir)
+                    shutil.rmtree(cwd)
 
-                self.save_test_results(logfile)
+                self.save_test_results(test_logfile)
+                if i == 1:
+                    self.save_test_environment_from_file(test_logfile)
 
                 if self.require("once"):
                     break
@@ -380,6 +405,7 @@ class TestCase:
 
 
 def run_command_output_to_file(environ, command, file):
+    logging.debug("Running command %s env=%s stdout_file=%s", command, environ, file)
     try:
         proc = subprocess.Popen(
             command,
@@ -466,7 +492,9 @@ def main():
         testdir = sys.argv[sys.argv.index("-testdir") + 1]
 
     loglevel = [logging.WARNING, logging.DEBUG][int(debug)]
-    logging.basicConfig(level=loglevel)
+    logging.basicConfig(
+        level=loglevel, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
     if specific_test:
         tests = [
@@ -483,13 +511,12 @@ def main():
     for test in tests:
         logging.info(f"== STARTING TEST {test.identifier} - {test.name} ==")
         logging.info(f"== DOING {runs} RUNS ==")
-        logging.info(test.description)
 
         ret = test.run(runs)
-        logging.debug("-- LAST LOG --")
-        logging.debug(open(test.logfilename).read())
-
-        logging.info("returncode: " + str(ret))
+        logging.info("-- LAST LOG --")
+        logging.info("Log: %s", test.test_logfilename)
+        logging.info("Prog under test log: %s", test.prog_under_test_logfilename)
+        logging.info("Returncode: %d", ret)
         logging.info(f"== FINISHED TEST {test.identifier} - {test.name} ==")
 
 
