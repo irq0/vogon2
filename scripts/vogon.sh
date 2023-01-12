@@ -51,19 +51,18 @@ vogon_testenv()
 vogon_testenv_harddisk()
 {
     local device="$1"
-    local device_name sysfs
+    local device_name sysfsdev queue
     device_name="$(basename "$device" | colrm 4)"
-    sysfs="/sys/block/${device_name}/device"
+    sysfsdev="/sys/block/${device_name}/device"
+    queue="/sys/block/${device_name}/queue"
 
-    vogon_testenv "hdd-model" "$(< "${sysfs}/model")"
-    vogon_testenv "hdd-vendor" "$(< "${sysfs}/vendor")"
-    vogon_testenv "hdd-revision" "$(< "${sysfs}/rev")"
+    vogon_testenv "hdd-model" "$(< "${sysfsdev}/model")"
+    vogon_testenv "hdd-serial" "$(< "${sysfsdev}/serial")"
     vogon_testenv "hdd-dev" "${device}"
-    vogon_testenv "hdd-cachesize" "$(sudo /sbin/hdparm -I "${device}" | grep "cache/buffer size" | awk '{ print $4 }')"
-    vogon_testenv "hdd-rpm" "$(sudo /sbin/hdparm -I "${device}" | grep "Nominal Media Rotation Rate:" | awk '{ print $5 }')"
-    vogon_testenv "hdd-transport" "$(sudo /sbin/hdparm -I "${device}" | grep "Transport:" | colrm 1 28)"
-    vogon_testenv "hdd-size" "$(sudo /sbin/hdparm -I "${device}" | grep "device size with M = 1000\*1000:" | colrm 1 45)"
-    vogon_testenv "hdd-secsize" "$(sudo /sbin/hdparm -I "${device}" | grep "Logical/Physical Sector size:" | colrm 1 48)"
+    vogon_testenv "hdd-rotational" "$(< "${queue}/rotational")"
+    vogon_testenv "hdd-hw-sector-size" "$(< "{queue}/hw_sector_size")"
+
+    # TODO add hdparm infos: data written, sector size, cache size, rpm, transport, temperature?, protocol
 }
 
 vogon_testenv_java()
