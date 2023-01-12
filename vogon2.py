@@ -51,6 +51,7 @@ class ContainerManager:
 class S3GW(ContainerManager):
     def __init__(self, cri, image, storage):
         self.storage = storage
+        self.s3gw_version = "unknown"
         super().__init__(cri, image)
 
     def run(self, **args):
@@ -66,8 +67,17 @@ class S3GW(ContainerManager):
                 }
             },
         )
+        ret, version = self.container.exec_run(["radosgw", "--version"])
+        if ret == 0:
+            self.s3gw_version = version
+
         logging.info("S3GW container: %s", self.container.name)
         return self.container
+
+    def env(self):
+        e = super().env()
+        e["s3gw-version"] = self.s3gw_version
+        return e
 
 
 class Storage:
@@ -321,9 +331,6 @@ class TestInstance:
             self.run_test(test)
 
     def run_test(self, test):
-        self.db.save_test_environment(
-            self.test_id, self.under_test_container.env(), "under-test-"
-        )
         self.db.save_test_environment(self.test_id, self.storage.env())
 
         for rep in range(self.reps):
@@ -336,6 +343,9 @@ class TestInstance:
                 raise AbortTest
 
         self.db.save_test_environment(self.test_id, test.env(self), "test-")
+        self.db.save_test_environment(
+            self.test_id, self.under_test_container.env(), "under-test-"
+        )
 
     def run_test_rep(self, test, rep):
         rep_id = results_db.make_id()
