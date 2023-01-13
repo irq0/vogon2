@@ -1,4 +1,4 @@
 click
-cpuinfo
 docker
+py-cpuinfo
 sqlite3
