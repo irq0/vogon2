@@ -120,6 +120,11 @@ class Storage:
     def env(self):
         return self.env_data
 
+    def drop_caches(self):
+        "Drop caches. Classic echo 3 > /proc/sys/vm/drop_caches"
+        # TODO implement cache dropping
+        return
+
 
 ResultList = [(str, Any, str)]
 
@@ -358,6 +363,7 @@ class TestInstance:
         # TODO be smarter about the started condition
         time.sleep(10)
 
+        self.storage.drop_caches()
         returncode = test.run(self)
 
         if returncode != 0:
