@@ -1,0 +1,5 @@
+* Preparation tasks on SLES machines
+Activate modules:
+#+begin_src bash
+SUSEConnect --product sle-module-python3/15.4/x86_64
+#+end_src

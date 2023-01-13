@@ -1,0 +1,33 @@
+---
+- name: Install packages
+  community.general.zypper:
+    name:
+      - htop
+      - smartmontools
+      - zsh
+      - git-core
+      - screen
+      - tmux
+      - lshw
+      - sqlite3
+      - podman
+      - podman-docker
+      - python310
+      - python310-setuptools
+      - python310-pip
+      - fio
+      - sudo
+    state: present
+
+- name: enable systemd persistent journal
+  file:
+    path: /var/log/journal
+    mode: "0755"
+    state: directory
+
+- name: enable podman service
+  ansible.builtin.systemd:
+    state: started
+    name: podman
+    enabled: true
+    masked: false

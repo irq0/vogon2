@@ -1,0 +1,19 @@
+---
+- name: add vogon group
+  ansible.builtin.group:
+    name: vogon
+    state: present
+
+- name: add vogon
+  ansible.builtin.user:
+    name: vogon
+    uid: 1337
+    group: vogon
+    shell: /bin/bash
+    password: "!"
+
+- name: sudoers
+  ansible.builtin.copy:
+    content: "vogon ALL=(ALL) NOPASSWD: ALL"
+    dest: /etc/sudoers.d/vogon
+    mode: "0400"

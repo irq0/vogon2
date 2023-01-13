@@ -1,0 +1,17 @@
+- name: clone vogon2 repo
+  ansible.builtin.git:
+    repo: https://github.com/irq0/vogon2.git
+    dest: /home/vogon/vogon2
+    version: master
+    single_branch: yes
+
+- name: virtualenv
+  ansible.builtin.pip:
+    requirements: /home/vogon/vogon2/requirements.txt
+    virtualenv: /home/vogon/vogon2-py-venv
+    virtualenv_command: /usr/bin/python3.10 -m venv
+
+- name: testrun
+  ansible.builtin.shell: |
+    source /home/vogon/vogon2-py-venv/bin/activate
+    /home/vogon/vogon2/vogon2.py --help

@@ -1,0 +1,6 @@
+---
+all:
+  children:
+    vogon:
+      hosts:
+        ares:

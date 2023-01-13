@@ -1,0 +1,14 @@
+---
+- name: Set up vogon server
+  hosts: vogon
+  roles:
+    - packages
+    - user-accounts
+    - storage
+
+- name: Install vogon2
+  hosts: vogon
+  become: yes
+  become_user: vogon
+  roles:
+    - vogon2

@@ -1,0 +1,9 @@
+- name: make vogon user own vogon disks
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: file
+    owner: vogon
+    group: vogon
+    mode: '0660'
+    follow: true
+  loop: '{{ vogon_disks }}'
