@@ -17,6 +17,9 @@
       - python310-pip
       - fio
       - sudo
+      - iotop
+      - sysstat
+      - dstat
     state: present
 
 - name: enable systemd persistent journal
