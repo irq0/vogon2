@@ -140,7 +140,7 @@ class Storage:
                 logging.debug("umount: %s", umount_out)
             except subprocess.CalledProcessError as e:
                 # on first run mountpoint is typically not mounted
-                if "not mounted" not in e.output:
+                if b"not mounted" not in e.output:
                     raise e
 
             format_out = subprocess.check_output(self.mkfs_command + [str(self.device)])
