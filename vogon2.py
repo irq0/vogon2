@@ -294,9 +294,6 @@ class WarpTest(ContainerizedTest):
         "--access-key=test",
         "--secret-key=test",
         "--benchdata=/warp.out",
-        "--duration=10s",
-        "--objects=10",
-        "--concurrent=1",
     ]
 
     def __init__(self, name: str, workload: str, args=None):
@@ -445,9 +442,16 @@ class TestInstance:
         self.under_test_container.terminate()
 
 
+warp_fast = WarpTest(
+    "mixed-default", "mixed", ["--duration=10s", "--objects=10", "--concurrent=1"]
+)
+
 warp_mixed_default = WarpTest("mixed-default", "mixed")
 warp_get_default = WarpTest("get-default", "get")
 warp_put_default = WarpTest("put-default", "put")
+warp_list_default = WarpTest("put-default", "list")
+warp_delete_default = WarpTest("put-default", "delete")
+warp_stat_default = WarpTest("put-default", "stat")
 
 fio_sfs_like = FIOTest("fio-sfs-like", SCRIPT_PATH / "fio" / "sfs-like_10M-files.fio")
 
@@ -459,9 +463,20 @@ test_suites = {
         ],
     ),
     "demo": TestSuite(
-        "Extensive test suite. 10 repetitions. Lots of benchmarks",
+        "Fast demo test suite",
+        tests=[
+            warp_fast,
+        ],
+    ),
+    "s3-simple-micro": TestSuite(
+        "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
         tests=[
             warp_mixed_default,
+            warp_get_default,
+            warp_put_default,
+            warp_list_default,
+            warp_delete_default,
+            warp_stat_default,
         ],
     ),
 }
