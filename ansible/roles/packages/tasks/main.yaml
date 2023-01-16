@@ -31,3 +31,19 @@
     name: podman
     enabled: true
     masked: false
+
+- name: make podman run dir accessible
+  ansible.builtin.file:
+    path: '/run/podman'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: make podman socket accessible
+  ansible.builtin.file:
+    path: '/run/podman/podman.sock'
+    state: touch
+    owner: root
+    group: vogon
+    mode: '0660'
