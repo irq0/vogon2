@@ -109,12 +109,11 @@ class ResultsDB:
         self.save_test_environment(test_id, env)
 
     def save_test_environment(
-        self, test_id: IDType, env: TestEnvType, prefix: str = None
+        self, test_id: IDType, env: TestEnvType, prefix: str = ""
     ):
         cur = self.db.cursor()
         for key, value in env.items():
-            if prefix:
-                key = prefix + key
+            key = prefix + key
             cur.execute(
                 """insert into environment (test_id, key, value)
                 values (?, ?, ?);""",
