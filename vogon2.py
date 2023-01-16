@@ -12,6 +12,9 @@ import docker
 
 import results_db
 
+SCRIPT_PATH = pathlib.Path(__file__).parent
+
+
 DockerImageType = str
 
 
@@ -230,14 +233,15 @@ class HostTest(Test):
 
 
 class FIOTest(HostTest):
-    def __init__(self, name, job_file):
+    def __init__(self, name: str, job_file: pathlib.Path):
         self.job_file = job_file
         super().__init__(name)
 
     def run(self, instance: "TestInstance"):
         try:
+            logging.info("running fio with job file %s", self.job_file)
             out = subprocess.check_output(
-                ["fio", "--output-format=json", self.job_file]
+                ["fio", "--output-format=json", str(self.job_file.absolute())]
             )
         except subprocess.CalledProcessError:
             logging.exception("fio crashed :()", exc_info=True)
@@ -429,9 +433,7 @@ warp_mixed_default = WarpTest("mixed-default", "mixed")
 warp_get_default = WarpTest("get-default", "get")
 warp_put_default = WarpTest("put-default", "put")
 
-fio_sfs_like = FIOTest(
-    "fio-sfs-like", "/home/seri/WORKSPACE/vogon/scripts/sfs-like_10M-files.fio"
-)
+fio_sfs_like = FIOTest("fio-sfs-like", SCRIPT_PATH / "fio" / "sfs-like_10M-files.fio")
 
 test_suites = {
     "baseline": TestSuite(
