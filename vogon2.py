@@ -111,19 +111,47 @@ class Storage:
         }
 
     def reset(self):
-        logging.info("Storage reset ;)")
-        # unmount
-        # format format command
-        # mount
-        pass
+        if not self.enable_reset_mkfs_mount:
+            logging.info("storage reset disabled. skipping umount, mkfs, mount")
+            return
+        try:
+            logging.info("Storage reset")
+            try:
+                umount_out = subprocess.check_output(
+                    ["sudo", "umount", self.mountpoint]
+                )
+                logging.debug("umount: %s", umount_out)
+            except subprocess.CalledProcessError as e:
+                # on first run mountpoint is typically not mounted
+                if "not mounted" not in e.output:
+                    raise e
+
+            format_out = subprocess.check_output(self.mkfs_command)
+            logging.debug("format out: %s", format_out)
+
+            mount_out = subprocess.check_output(
+                ["sudo", "mount", self.device, self.mountpoint]
+            )
+            logging.debug("mount out: %s", mount_out)
+        except subprocess.CalledProcessError as e:
+            logging.exception(
+                "storage reset (umount,mkfs,mount) failed with %s. failing benchmark", e
+            )
+            raise e
 
     def env(self):
         return self.env_data
 
     def drop_caches(self):
         "Drop caches. Classic echo 3 > /proc/sys/vm/drop_caches"
-        # TODO implement cache dropping
-        return
+        # raises exception if fails
+        try:
+            subprocess.check_call(
+                ["sudo", "bash", "-c", "echo 3 > /proc/sys/vm/drop_caches"]
+            )
+        except subprocess.CalledProcessError as e:
+            logging.exception("os cached drop failed. failing benchmark")
+            raise e
 
 
 ResultList = [(str, Any, str)]
