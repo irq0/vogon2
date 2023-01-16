@@ -147,16 +147,23 @@ class Storage:
                 if b"not mounted" not in e.output:
                     raise e
 
-            format_out = subprocess.check_output(
+            mkfs_out = subprocess.check_output(
                 self.mkfs_command + [str(self.device)], stderr=subprocess.STDOUT
             )
-            logging.debug("format out: %s", format_out)
+            logging.debug("format out: %s", mkfs_out)
 
             mount_out = subprocess.check_output(
                 ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())],
                 stderr=subprocess.STDOUT,
             )
             logging.debug("mount out: %s", mount_out)
+
+            chown_out = subprocess.check_output(
+                ["sudo", "chown", "vogon:vogon", self.mountpoint],
+                stderr=subprocess.STDOUT,
+            )
+            logging.debug("chown out: %s", chown_out)
+
         except subprocess.CalledProcessError as e:
             logging.exception(
                 "storage reset (umount,mkfs,mount) failed with exit %s out %s. "
