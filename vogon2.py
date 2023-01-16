@@ -135,7 +135,8 @@ class Storage:
             logging.info("Storage reset")
             try:
                 umount_out = subprocess.check_output(
-                    ["sudo", "umount", str(self.mountpoint.absolute())]
+                    ["sudo", "umount", str(self.mountpoint.absolute())],
+                    stderr=subprocess.STDOUT,
                 )
                 logging.debug("umount: %s", umount_out)
             except subprocess.CalledProcessError as e:
@@ -143,11 +144,14 @@ class Storage:
                 if b"not mounted" not in e.output:
                     raise e
 
-            format_out = subprocess.check_output(self.mkfs_command + [str(self.device)])
+            format_out = subprocess.check_output(
+                self.mkfs_command + [str(self.device)], stderr=subprocess.STDOUT
+            )
             logging.debug("format out: %s", format_out)
 
             mount_out = subprocess.check_output(
-                ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())]
+                ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())],
+                stderr=subprocess.STDOUT,
             )
             logging.debug("mount out: %s", mount_out)
         except subprocess.CalledProcessError as e:
