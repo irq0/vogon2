@@ -159,7 +159,10 @@ class Storage:
             logging.debug("mount out: %s", mount_out)
         except subprocess.CalledProcessError as e:
             logging.exception(
-                "storage reset (umount,mkfs,mount) failed with %s. failing benchmark", e
+                "storage reset (umount,mkfs,mount) failed with exit %s out %s. "
+                "failing benchmark",
+                e.returncode,
+                e.output,
             )
             raise e
 
