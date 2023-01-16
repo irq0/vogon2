@@ -242,9 +242,15 @@ class FIOTest(HostTest):
 
     def run(self, instance: "TestInstance"):
         try:
-            logging.info("running fio with job file %s", self.job_file)
+            logging.info(
+                "running fio with job file %s in %s",
+                self.job_file,
+                instance.storage.mountpoint,
+            )
             out = subprocess.check_output(
-                ["fio", "--output-format=json", str(self.job_file.absolute())]
+                ["fio", "--output-format=json", str(self.job_file.absolute())],
+                stderr=subprocess.STDOUT,
+                cwd=instance.storage.mountpoint,
             )
         except subprocess.CalledProcessError:
             logging.exception("fio crashed :()", exc_info=True)
