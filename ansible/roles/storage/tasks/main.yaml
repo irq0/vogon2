@@ -7,3 +7,11 @@
     mode: '0660'
     follow: true
   loop: '{{ vogon_disks }}'
+
+- name: make vogon mountpoint
+  ansible.builtin.file:
+    path: '/home/vogon/mnt'
+    state: directory
+    owner: vogon
+    group: vogon
+    mode: '0775'
