@@ -91,15 +91,13 @@ class S3GW(ContainerManager):
 
 
 class Storage:
-    """"""
-
-    "A storage device to run the program under test on" ""
+    "A storage device to run the program under test on"
 
     def __init__(
         self,
         enable_reset_mkfs_mount: bool,
-        device: str,
-        mountpoint: str,
+        device: pathlib.Path,
+        mountpoint: pathlib.Path,
         mkfs_command: list[str],
     ):
         self.enable_reset_mkfs_mount = enable_reset_mkfs_mount
@@ -115,7 +113,7 @@ class Storage:
                 "--output",
                 "NAME,TYPE,MODEL,VENDOR,FSTYPE,FSSIZE,PHY-SEC,REV,ROTA,SCHED,RQ-SIZE",
                 "--json",
-                self.device,
+                str(self.device),
             ]
         )
         d = json.loads(out)["blockdevices"][0]
@@ -137,7 +135,7 @@ class Storage:
             logging.info("Storage reset")
             try:
                 umount_out = subprocess.check_output(
-                    ["sudo", "umount", self.mountpoint]
+                    ["sudo", "umount", str(self.mountpoint.absolute())]
                 )
                 logging.debug("umount: %s", umount_out)
             except subprocess.CalledProcessError as e:
@@ -145,11 +143,11 @@ class Storage:
                 if "not mounted" not in e.output:
                     raise e
 
-            format_out = subprocess.check_output(self.mkfs_command)
+            format_out = subprocess.check_output(self.mkfs_command + [str(self.device)])
             logging.debug("format out: %s", format_out)
 
             mount_out = subprocess.check_output(
-                ["sudo", "mount", self.device, self.mountpoint]
+                ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())]
             )
             logging.debug("mount out: %s", mount_out)
         except subprocess.CalledProcessError as e:
@@ -476,21 +474,51 @@ def cli(ctx, debug):
 )
 @click.option(
     "--archive-dir",
-    type=click.Path(exists=True),
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
     required=True,
     help="Directory to archive test artifacts to",
 )
 @click.option(
     "--storage-device",
-    type=click.Path(exists=True),
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
     required=True,
     help="Storage device to run on (e.g /dev/disk/by-id/...)",
 )
 @click.option(
     "--mountpoint",
-    type=click.Path(exists=True),
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
     required=True,
     help="Mountpoint for --storage-device",
+)
+@click.option(
+    "--mkfs",
+    type=str,
+    required=True,
+    help="mkfs command. splitted by .split(). append device on call",
 )
 @click.option(
     "--docker-api",
@@ -515,6 +543,7 @@ def test(
     archive_dir,
     storage_device,
     mountpoint,
+    mkfs,
     docker_api,
     sqlite,
     init_db,
@@ -526,10 +555,10 @@ def test(
     if init_db:
         results_db.init_db(dbconn)
     db = results_db.ResultsDB(dbconn)
-    storage = Storage(reset_storage, storage_device, mountpoint, None)
+    storage = Storage(reset_storage, storage_device, mountpoint, mkfs.split())
     s3gw = S3GW(cri, under_test_image, storage)
     test_instance = TestInstance(
-        cri, db, s3gw, test_suites[suite], storage, pathlib.Path(archive_dir), repeat
+        cri, db, s3gw, test_suites[suite], storage, archive_dir, repeat
     )
     try:
         test_instance.run()
