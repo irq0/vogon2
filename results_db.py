@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 import platform
+import sqlite3
+import typing
 import uuid
 
 from cpuinfo import get_cpu_info
 
+IDType = str
+TestResultType = tuple[str, str, str]
+TestResultsType = list[TestResultType]
+TestEnvType = dict[str, typing.Any]
+
 
 class ResultsDB:
-    def __init__(self, sqlite_db):
+    def __init__(self, sqlite_db: sqlite3.Connection):
         self.db = sqlite_db
 
-    def parse_and_save_test_results(self, rep_id, logfile):
+    def parse_and_save_test_results(self, rep_id: IDType, logfile: typing.TextIO):
         """
         Parse logfile for lines starting with VOGON_TEST_RESULT and
         try to parse them for test output. This output is then written to
@@ -35,7 +42,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_test_results(self, rep_id, results: []):
+    def save_test_results(self, rep_id: IDType, results: TestResultsType):
         """
         Parse logfile for lines starting with VOGON_TEST_RESULT and
         try to parse them for test output. This output is then written to
@@ -51,7 +58,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_test_environment_default(self, test_id):
+    def save_test_environment_default(self, test_id: IDType):
         """
         Save default test environment with information about the machine and test runner
         """
@@ -83,7 +90,9 @@ class ResultsDB:
 
         self.save_test_environment(test_id, env)
 
-    def parse_and_save_test_environment_from_file(self, test_id, file):
+    def parse_and_save_test_environment_from_file(
+        self, test_id: IDType, file: typing.BinaryIO
+    ):
         file.seek(0)
         env = {}
         for line in file:
@@ -99,7 +108,9 @@ class ResultsDB:
 
         self.save_test_environment(test_id, env)
 
-    def save_test_environment(self, test_id, env: dict, prefix=None):
+    def save_test_environment(
+        self, test_id: IDType, env: TestEnvType, prefix: str = None
+    ):
         cur = self.db.cursor()
         for key, value in env.items():
             if prefix:
@@ -112,7 +123,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_before_test(self, test_id, test_name):
+    def save_before_test(self, test_id: IDType, test_name: str):
         """
         Make new entry in database with test details
         """
@@ -125,7 +136,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_after_test(self, test_id):
+    def save_after_test(self, test_id: IDType):
         """
         Make new entry in database with test details
         """
@@ -133,12 +144,12 @@ class ResultsDB:
         cur.execute(
             """update tests set finished = strftime('%Y-%m-%d %H:%M:%f')
                        where test_id = ?;""",
-            [self.test_id],
+            [test_id],
         )
         self.db.commit()
         cur.close()
 
-    def save_before_rep(self, test_id, rep_id):
+    def save_before_rep(self, test_id: IDType, rep_id: IDType):
         """
         Make new entry in database with test details
         """
@@ -151,7 +162,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_after_rep(self, rep_id, returncode):
+    def save_after_rep(self, rep_id: IDType, returncode):
         """
         Make new entry in database with test details
         """
@@ -224,5 +235,5 @@ def init_db(dbconn):
     cur.close()
 
 
-def make_id():
+def make_id() -> IDType:
     return str(uuid.uuid4())

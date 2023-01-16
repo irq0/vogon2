@@ -12,36 +12,44 @@ import docker
 
 import results_db
 
+DockerImageType = str
+
 
 class ContainerManager:
     """Wraps container runtime interface API to simplifiy
     run, terminate, retrieve logs and test environment data
     """
 
-    def __init__(self, cri: docker.DockerClient, image: str):
+    def __init__(self, cri: docker.DockerClient, image: DockerImageType):
         self.cri = cri
         self.image = self.cri.images.pull(image)
         logging.debug("Pulled %s", self.image)
 
-    def run(self, **args):
-        self.container = self.cri.containers.run(self.image.id, detach=True, **args)
+    def run(self, **kwargs) -> docker.models.containers.Container:
+        """wrap docker client run(). runs detached and set
+        self.container to the started container. forward args"""
+
+        self.container = self.cri.containers.run(self.image.id, detach=True, **kwargs)
         logging.debug(
             "Started container for image %s: %s", self.image, self.container.name
         )
         return self.container
 
-    def run_once(self, **args):
-        return self.cri.containers.run(self.image.id, **args)
+    def run_once(self, **kwargs) -> str:
+        "wrap docker client run(). like subprocess.check_output()"
+        return self.cri.containers.run(self.image.id, **kwargs)
 
     def terminate(self):
+        "terminate container started with run()"
         res = self.container.stop(timeout=30)
         logging.info("Terminating container %s: %s", self.container, res)
-        return res
 
-    def logs(self, **kwargs):
+    def logs(self, **kwargs) -> bytes:
+        "get logs of container started with run()"
         return self.container.logs(**kwargs)
 
-    def env(self):
+    def env(self) -> results_db.TestEnvType:
+        "get test environment data"
         return {
             "image-id": self.image.id,
             "image-tags": ";".join(self.image.tags),
@@ -49,7 +57,9 @@ class ContainerManager:
 
 
 class S3GW(ContainerManager):
-    def __init__(self, cri, image, storage):
+    def __init__(
+        self, cri: docker.DockerClient, image: DockerImageType, storage: "Storage"
+    ):
         self.storage = storage
         self.s3gw_version = "unknown"
         super().__init__(cri, image)
@@ -81,12 +91,21 @@ class S3GW(ContainerManager):
 
 
 class Storage:
-    """A storage device to run the program under test on"""
+    """"""
 
-    def __init__(self, device, mountpoint, format_command):
+    "A storage device to run the program under test on" ""
+
+    def __init__(
+        self,
+        enable_reset_mkfs_mount: bool,
+        device: str,
+        mountpoint: str,
+        mkfs_command: list[str],
+    ):
+        self.enable_reset_mkfs_mount = enable_reset_mkfs_mount
         self.mountpoint = mountpoint
         self.device = device
-        self.format_command = format_command
+        self.mkfs_command = mkfs_command
 
         logging.info("Storage device: %s mountpoint %s", self.device, self.mountpoint)
 
@@ -161,15 +180,15 @@ class Test:
     def __init__(self, name: str):
         self.name = name
 
-    def env(self, instance):
+    def env(self, instance: "TestInstance") -> results_db.TestEnvType:
         "Return environment data. e.g test tool version"
         raise NotImplementedError
 
-    def results(self, instance) -> ResultList:
+    def results(self, instance: "TestInstance") -> results_db.TestResultsType:
         "Return test run results"
         raise NotImplementedError
 
-    def run(self, instance):
+    def run(self, instance: "TestInstance") -> int:
         "Run test to completion"
         raise NotImplementedError
 
@@ -179,18 +198,18 @@ class AbortTest(Exception):
 
 
 class ContainerizedTest(Test):
-    def __init__(self, name: str, container: str):
-        self.container = container
+    def __init__(self, name: str, container_image: DockerImageType):
+        self.container_image = container_image
         super().__init__(name)
 
-    def run(self, instance):
-        container = ContainerManager(instance.cri, self.container.image)
-        return container.run()
+    def run(self, instance: "TestInstance"):
+        container_manager = ContainerManager(instance.cri, self.container_image)
+        return container_manager.run()
 
-    def env(self, instance):
-        return self.container.env()
+    def env(self, instance: "TestInstance"):
+        raise NotImplementedError
 
-    def results(self, instance):
+    def results(self, instance: "TestInstance"):
         raise NotImplementedError
 
 
@@ -198,13 +217,13 @@ class HostTest(Test):
     def __init__(self, name):
         super().__init__(name)
 
-    def run(self, instance):
+    def run(self, instance: "TestInstance"):
         raise NotImplementedError
 
-    def env(self, instance):
+    def env(self, instance: "TestInstance"):
         raise NotImplementedError
 
-    def results(self, instance):
+    def results(self, instance: "TestInstance") -> results_db.TestResultsType:
         raise NotImplementedError
 
 
@@ -213,7 +232,7 @@ class FIOTest(HostTest):
         self.job_file = job_file
         super().__init__(name)
 
-    def run(self, instance):
+    def run(self, instance: "TestInstance"):
         try:
             out = subprocess.check_output(
                 ["fio", "--output-format=json", self.job_file]
@@ -227,10 +246,10 @@ class FIOTest(HostTest):
 
         return 0
 
-    def env(self, instance):
+    def env(self, instance: "TestInstance"):
         return {"fio-version": self.data["fio version"]}
 
-    def results(self, instance):
+    def results(self, instance: "TestInstance"):
         j = self.data["jobs"][0]
         return [
             ("JSON", self.json, "JSON"),
@@ -242,7 +261,7 @@ class FIOTest(HostTest):
 
 
 class WarpTest(ContainerizedTest):
-    container_image = "minio/warp"
+    default_container_image = "minio/warp"
     default_args = [
         "--no-color",
         "--json",
@@ -258,12 +277,12 @@ class WarpTest(ContainerizedTest):
         "--concurrent=1",
     ]
 
-    def __init__(self, name, workload, args=None):
-        super().__init__(name, self.container_image)
+    def __init__(self, name: str, workload: str, args=None):
+        super().__init__(name, self.default_container_image)
         self.workload = workload
         self.args = args
 
-    def run(self, instance):
+    def run(self, instance: "TestInstance"):
         self.container = ContainerManager(instance.cri, self.container_image)
         self.warp_version = self.container.run_once(command="--version")
         args = []
@@ -290,7 +309,7 @@ class WarpTest(ContainerizedTest):
 
         return result["StatusCode"]
 
-    def results(self, instance):
+    def results(self, instance: "TestInstance"):
         results = []
         if not self.last_run:
             return None
@@ -320,7 +339,7 @@ class WarpTest(ContainerizedTest):
 
         return results
 
-    def env(self, instance):
+    def env(self, instance: "TestInstance"):
         env = self.container.env()
         env["warp-version"] = self.warp_version
         return env
@@ -451,7 +470,7 @@ def cli(ctx, debug):
 )
 @click.option(
     "--suite",
-    type=click.Choice(test_suites),
+    type=click.Choice(list(test_suites.keys())),
     required=True,
     help="Test suite. See vogon2.py for configuration",
 )
@@ -469,7 +488,7 @@ def cli(ctx, debug):
 )
 @click.option(
     "--mountpoint",
-    type=click.Path(exists=1),
+    type=click.Path(exists=True),
     required=True,
     help="Mountpoint for --storage-device",
 )
@@ -483,6 +502,11 @@ def cli(ctx, debug):
     "--sqlite", type=str, required=True, help="Where to find the sqlite database?"
 )
 @click.option("--init-db/--no-init-db", default=False, help="Create tables, etc")
+@click.option(
+    "--reset-storage/--no-reset-storage",
+    default=False,
+    help="Reset storage (umount,mkfs,mount) between reps",
+)
 @click.option("--repeat", type=int, default=1, help="How many repetitions to run")
 def test(
     ctx,
@@ -494,6 +518,7 @@ def test(
     docker_api,
     sqlite,
     init_db,
+    reset_storage,
     repeat,
 ):
     cri = docker.DockerClient(base_url=docker_api)
@@ -501,7 +526,7 @@ def test(
     if init_db:
         results_db.init_db(dbconn)
     db = results_db.ResultsDB(dbconn)
-    storage = Storage(storage_device, mountpoint, None)
+    storage = Storage(reset_storage, storage_device, mountpoint, None)
     s3gw = S3GW(cri, under_test_image, storage)
     test_instance = TestInstance(
         cri, db, s3gw, test_suites[suite], storage, pathlib.Path(archive_dir), repeat
