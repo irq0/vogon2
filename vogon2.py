@@ -84,7 +84,7 @@ class S3GW(ContainerManager):
         if ret == 0:
             self.s3gw_version = version
 
-        logging.info("S3GW container: %s", self.container.name)
+        logging.info("🔎 S3GW container: %s", self.container.name)
         return self.container
 
     def env(self):
@@ -132,10 +132,13 @@ class Storage:
 
     def reset(self):
         if not self.enable_reset_mkfs_mount:
-            logging.info("storage reset disabled. skipping umount, mkfs, mount")
+            logging.info("🛢 storage reset disabled. skipping umount, mkfs, mount")
             return
         try:
-            logging.info("Storage reset")
+            logging.info(
+                f"🛢 resetting storage: mountpoint {self.mountpoint}, "
+                f"dev {self.device}, command {self.mkfs_command}"
+            )
             try:
                 umount_out = subprocess.check_output(
                     ["sudo", "umount", str(self.mountpoint.absolute())],
@@ -150,7 +153,7 @@ class Storage:
             mkfs_out = subprocess.check_output(
                 self.mkfs_command + [str(self.device)], stderr=subprocess.STDOUT
             )
-            logging.debug("format out: %s", mkfs_out)
+            logging.debug("mkfs out: %s", mkfs_out)
 
             mount_out = subprocess.check_output(
                 ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())],
@@ -195,16 +198,19 @@ class Test:
     def __init__(self, name: str):
         self.name = name
 
-    def env(self, instance: "TestInstance") -> results_db.TestEnvType:
+    def env(self, instance: "TestRunner") -> results_db.TestEnvType:
         "Return environment data. e.g test tool version"
         raise NotImplementedError
 
-    def results(self, instance: "TestInstance") -> results_db.TestResultsType:
+    def results(self, instance: "TestRunner") -> results_db.TestResultsType:
         "Return test run results"
         raise NotImplementedError
 
-    def run(self, instance: "TestInstance") -> int:
+    def run(self, instance: "TestRunner") -> int:
         "Run test to completion"
+        raise NotImplementedError
+
+    def kind(self) -> str:
         raise NotImplementedError
 
 
@@ -217,14 +223,17 @@ class ContainerizedTest(Test):
         self.container_image = container_image
         super().__init__(name)
 
-    def run(self, instance: "TestInstance"):
+    def run(self, instance: "TestRunner"):
         container_manager = ContainerManager(instance.cri, self.container_image)
         return container_manager.run()
 
-    def env(self, instance: "TestInstance"):
+    def env(self, instance: "TestRunner"):
         raise NotImplementedError
 
-    def results(self, instance: "TestInstance"):
+    def results(self, instance: "TestRunner"):
+        raise NotImplementedError
+
+    def kind(self) -> str:
         raise NotImplementedError
 
 
@@ -232,13 +241,16 @@ class HostTest(Test):
     def __init__(self, name):
         super().__init__(name)
 
-    def run(self, instance: "TestInstance"):
+    def run(self, instance: "TestRunner"):
         raise NotImplementedError
 
-    def env(self, instance: "TestInstance"):
+    def env(self, instance: "TestRunner"):
         raise NotImplementedError
 
-    def results(self, instance: "TestInstance") -> results_db.TestResultsType:
+    def results(self, instance: "TestRunner") -> results_db.TestResultsType:
+        raise NotImplementedError
+
+    def kind(self) -> str:
         raise NotImplementedError
 
 
@@ -247,7 +259,7 @@ class FIOTest(HostTest):
         self.job_file = job_file
         super().__init__(name)
 
-    def run(self, instance: "TestInstance"):
+    def run(self, instance: "TestRunner"):
         try:
             logging.info(
                 "running fio with job file %s in %s",
@@ -268,10 +280,10 @@ class FIOTest(HostTest):
 
         return 0
 
-    def env(self, instance: "TestInstance"):
+    def env(self, instance: "TestRunner"):
         return {"fio-version": self.data["fio version"]}
 
-    def results(self, instance: "TestInstance"):
+    def results(self, instance: "TestRunner"):
         j = self.data["jobs"][0]
         return [
             ("JSON", self.json, "JSON"),
@@ -280,6 +292,12 @@ class FIOTest(HostTest):
             ("write-iops", j["read"]["iops"], "iops"),
             ("write-bw", j["read"]["bw_bytes"], "byte"),
         ]
+
+    def kind(self) -> str:
+        return "FIO"
+
+    def __str__(self) -> str:
+        return f"FIO(job_file={self.job_file})"
 
 
 class WarpTest(ContainerizedTest):
@@ -301,7 +319,7 @@ class WarpTest(ContainerizedTest):
         self.workload = workload
         self.args = args
 
-    def run(self, instance: "TestInstance"):
+    def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
         self.warp_version = self.container.run_once(command="--version")
         args = []
@@ -312,10 +330,9 @@ class WarpTest(ContainerizedTest):
             args.extend(self.args)
 
         running = self.container.run(command=args, network_mode="host")
-        logging.info("Warp container: %s", running.name)
+        logging.info("🔎 Warp container: %s", running.name)
 
         result = running.wait()
-        running.commit("localhost/vogon/warp", instance.test_id)
         self.last_run = running
 
         try:
@@ -328,7 +345,7 @@ class WarpTest(ContainerizedTest):
 
         return result["StatusCode"]
 
-    def results(self, instance: "TestInstance"):
+    def results(self, instance: "TestRunner"):
         results = []
         if not self.last_run:
             return None
@@ -358,25 +375,32 @@ class WarpTest(ContainerizedTest):
 
         return results
 
-    def env(self, instance: "TestInstance"):
+    def env(self, instance: "TestRunner"):
         env = self.container.env()
         env["warp-version"] = self.warp_version
         return env
 
+    def kind(self) -> str:
+        return "WARP"
+
+    def __str__(self) -> str:
+        args_str = ",".join(self.args)
+        return f"Warp(workload={self.workload}, args={args_str})"
+
 
 class TestSuite:
-    def __init__(self, name: str, tests: list[Test]):
+    def __init__(self, name: str, description: str, tests: list[Test]):
         self.name = name
+        self.description = description
         self.tests = tests
 
 
-class TestInstance:
+class TestRunner:
     def __init__(
         self,
         cri: docker.DockerClient,
         db: results_db.ResultsDB,
         under_test_container: ContainerManager,
-        suite: TestSuite,
         storage: Storage,
         archive: pathlib.Path,
         reps: int,
@@ -384,91 +408,150 @@ class TestInstance:
         self.cri = cri
         self.db = db
         self.under_test_container = under_test_container
-        self.suite = suite
         self.storage = storage
         self.archive = archive
         self.reps = reps
 
-        self.name = suite.name
-        self.test_id = results_db.make_id()
+        self.under_test_container_env_saved = False
 
-    def run(self):
-        logging.info(f"== STARTING TEST {self.name} - {self.test_id} ==")
-        logging.info(f"== DOING {self.reps} RUNS ==")
-        self.db.save_before_test(self.test_id, self.name)
-        self.db.save_test_environment_default(self.test_id)
+    def __str__(self):
+        return f"TestSuite(name={self.suite_name}, id={self.suite_id})"
 
-        for test in self.suite.tests:
-            self.run_test(test)
+    def run_suite(self, suite):
+        suite_id = results_db.make_id()
+        logging.info(f"▶️ STARTING TEST SUITE {suite.name} ID {suite_id}")
+        logging.info(f"♻️ {self.reps} REPS / TEST")
+        self.db.save_before_suite(suite_id, suite.name, suite.description)
+        self.db.save_test_environment_default(suite_id)
+        self.db.save_test_environment(suite_id, self.storage.env())
 
-    def run_test(self, test):
-        self.db.save_test_environment(self.test_id, self.storage.env())
+        for test in suite.tests:
+            self.run_test(suite_id, test)
+
+        self.db.save_after_suite(suite_id)
+
+    def run_test(self, suite_id, test: Test):
+        test_id = results_db.make_id()
+
+        self.db.save_before_test(test_id, str(test), test.kind())
+        logging.info(f"🔎 TEST {test} ID {test_id}")
 
         for rep in range(self.reps):
+            logging.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
             try:
-                self.run_test_rep(test, rep)
+                self.run_test_rep(suite_id, test_id, test, rep)
             except Exception:
                 logging.exception(
-                    "Test %s rep %s failed. Aborting rest run", test, rep, exc_info=True
+                    "😥 TEST %s REP %s/%s FAILED. Continuing with next test in suite",
+                    test,
+                    rep,
+                    self.reps,
+                    exc_info=True,
                 )
-                raise AbortTest
+                return
 
-        self.db.save_test_environment(self.test_id, test.env(self), "test-")
-        self.db.save_test_environment(
-            self.test_id, self.under_test_container.env(), "under-test-"
-        )
+        self.db.save_after_test(test_id)
+        self.db.save_test_environment(suite_id, test.env(self), test.name + "-")
 
-    def run_test_rep(self, test, rep):
+    def run_test_rep(self, suite_id, test_id, test, rep):
         rep_id = results_db.make_id()
-        self.db.save_before_rep(self.test_id, rep_id)
+        self.db.save_before_rep(test_id, rep_id)
         self.storage.reset()
 
-        logging.info("%d - %s %s", rep, test, rep_id)
+        logging.info("🔎️ TEST %s REP ID %s", test.name, rep_id)
         self.under_test_container.run()
+        self.save_under_test_container_env_once(suite_id)
 
         # TODO be smarter about the started condition
         time.sleep(10)
 
         self.storage.drop_caches()
-        returncode = test.run(self)
+        try:
+            returncode = test.run(self)
+        except Exception as e:
+            logging.exception(
+                "😥 TEST %s REP ID %s failed with exception: %s",
+                test.name,
+                rep_id,
+                e,
+                exc_info=True,
+            )
+
+            self.db.save_after_rep(rep_id, -10, f"failed with exception: {str(e)}")
+            raise e
 
         if returncode != 0:
-            logging.exception("Test rep failed with %d: %s", returncode, test.name)
+            logging.error(
+                "😥 TEST %s REP ID %s finished with returncode != 0: %s",
+                test.name,
+                rep_id,
+                returncode,
+            )
+            self.db.save_after_rep(
+                rep_id, returncode, "failed with non-zero return code"
+            )
             raise AbortTest
 
-        self.db.save_after_rep(rep_id, returncode)
-        self.db.save_test_results(rep_id, test.results(self))
+        try:
+            results = test.results(self)
+        except Exception as e:
+            logging.exception(
+                "😥 TEST %s REP ID %s" " result parsing failed with exception: %s",
+                test.name,
+                rep_id,
+                e,
+                exc_info=True,
+            )
+            self.db.save_after_rep(
+                rep_id, -20, f"result parser returned exception: {str(e)}"
+            )
+            raise e
+
+        self.db.save_after_rep(rep_id, returncode, "successful")
+        self.db.save_test_results(rep_id, results)
 
         self.under_test_container.terminate()
 
+    def save_under_test_container_env_once(self, suite_id):
+        # call this after first run() - under test container usually
+        # has env data avail afterwards
+        if self.under_test_container_env_saved:
+            return
+        self.db.save_test_environment(
+            suite_id, self.under_test_container.env(), "under-test-"
+        )
+
 
 warp_fast = WarpTest(
-    "mixed-default", "mixed", ["--duration=10s", "--objects=10", "--concurrent=1"]
+    "mixed-fast", "mixed", ["--duration=10s", "--objects=10", "--concurrent=1"]
 )
 
 warp_mixed_default = WarpTest("mixed-default", "mixed")
 warp_get_default = WarpTest("get-default", "get")
 warp_put_default = WarpTest("put-default", "put")
-warp_list_default = WarpTest("put-default", "list")
-warp_delete_default = WarpTest("put-default", "delete")
-warp_stat_default = WarpTest("put-default", "stat")
+warp_list_default = WarpTest("list-default", "list")
+warp_delete_default = WarpTest("delete-default", "delete")
+warp_stat_default = WarpTest("stat-default", "stat")
 
 fio_sfs_like = FIOTest("fio-sfs-like", SCRIPT_PATH / "fio" / "sfs-like_10M-files.fio")
 
-test_suites = {
-    "baseline": TestSuite(
+test_suites = [
+    TestSuite(
+        "baseline",
         "Test disk baseline performance",
         tests=[
             fio_sfs_like,
         ],
     ),
-    "demo": TestSuite(
+    TestSuite(
+        "demo",
         "Fast demo test suite",
         tests=[
             warp_fast,
         ],
     ),
-    "s3-simple-micro": TestSuite(
+    TestSuite(
+        "s3-simple-micro",
         "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
         tests=[
             warp_mixed_default,
@@ -479,7 +562,9 @@ test_suites = {
             warp_stat_default,
         ],
     ),
-}
+]
+
+test_suites_indexed = {suite.name: suite for suite in test_suites}
 
 
 @click.group()
@@ -493,6 +578,7 @@ def cli(ctx, debug):
     )
     ctx.obj["DEBUG"] = debug
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARN)
+    logging.getLogger("docker.auth").setLevel(logging.INFO)
 
 
 @cli.command()
@@ -505,7 +591,7 @@ def cli(ctx, debug):
 )
 @click.option(
     "--suite",
-    type=click.Choice(list(test_suites.keys())),
+    type=click.Choice(list(test_suites_indexed.keys())),
     required=True,
     help="Test suite. See vogon2.py for configuration",
 )
@@ -594,11 +680,9 @@ def test(
     db = results_db.ResultsDB(dbconn)
     storage = Storage(reset_storage, storage_device, mountpoint, mkfs.split())
     s3gw = S3GW(cri, under_test_image, storage)
-    test_instance = TestInstance(
-        cri, db, s3gw, test_suites[suite], storage, archive_dir, repeat
-    )
+    test_runner = TestRunner(cri, db, s3gw, storage, archive_dir, repeat)
     try:
-        test_instance.run()
+        test_runner.run_suite(test_suites_indexed[suite])
     finally:
         s3gw.terminate()
         dbconn.close()

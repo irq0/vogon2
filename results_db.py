@@ -66,9 +66,9 @@ class ResultsDB:
         env = {}
         env["machine_type"] = platform.machine()
         env["os"] = platform.system()
-        env["os_release"] = platform.release()
-        env["os_version"] = platform.version()
-        env["node_name"] = platform.node()
+        env["os-release"] = platform.release()
+        env["os-version"] = platform.version()
+        env["node-name"] = platform.node()
         cpuinfo = get_cpu_info()
         env["cpu-brand"] = cpuinfo["brand_raw"]
         env["arch"] = cpuinfo["arch"]
@@ -109,23 +109,40 @@ class ResultsDB:
         self.save_test_environment(test_id, env)
 
     def save_test_environment(
-        self, test_id: IDType, env: TestEnvType, prefix: str = ""
+        self, suite_id: IDType, env: TestEnvType, prefix: str = ""
     ):
         cur = self.db.cursor()
         for key, value in env.items():
             key = prefix + key
             cur.execute(
-                """insert into environment (test_id, key, value)
+                """insert into environment (suite_id, key, value)
                 values (?, ?, ?);""",
-                (test_id, key, value),
+                (suite_id, key, value),
             )
         self.db.commit()
         cur.close()
 
-    def save_before_test(self, test_id: IDType, test_name: str):
-        """
-        Make new entry in database with test details
-        """
+    def save_before_suite(self, suite_id: IDType, suite_name: str, description: str):
+        cur = self.db.cursor()
+        cur.execute(
+            """insert into suites (suite_id, start, name, description)
+                                    values (?, strftime('%Y-%m-%d %H:%M:%f'), ?, ?);""",
+            (suite_id, suite_name, description),
+        )
+        self.db.commit()
+        cur.close()
+
+    def save_after_suite(self, suite_id: IDType):
+        cur = self.db.cursor()
+        cur.execute(
+            """update suites set finished = strftime('%Y-%m-%d %H:%M:%f')
+                       where suite_id = ?;""",
+            [suite_id],
+        )
+        self.db.commit()
+        cur.close()
+
+    def save_before_test(self, test_id: IDType, test_name: str, kind: str):
         cur = self.db.cursor()
         cur.execute(
             """insert into tests (test_id, start, name)
@@ -136,9 +153,6 @@ class ResultsDB:
         cur.close()
 
     def save_after_test(self, test_id: IDType):
-        """
-        Make new entry in database with test details
-        """
         cur = self.db.cursor()
         cur.execute(
             """update tests set finished = strftime('%Y-%m-%d %H:%M:%f')
@@ -161,7 +175,7 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_after_rep(self, rep_id: IDType, returncode):
+    def save_after_rep(self, rep_id: IDType, returncode: int, message: str):
         """
         Make new entry in database with test details
         """
@@ -171,10 +185,13 @@ class ResultsDB:
                        where rep_id = ?;""",
             [rep_id],
         )
-
         cur.execute(
             """update test_repetitions set returncode = ? where rep_id = ?;""",
             (returncode, rep_id),
+        )
+        cur.execute(
+            """update test_repetitions set message = ? where rep_id = ?;""",
+            (message, rep_id),
         )
         self.db.commit()
         cur.close()
@@ -182,9 +199,11 @@ class ResultsDB:
 
 def init_db(dbconn):
     """Initialize database
+    suites: an execution of a test suite from start to finish.
+    has one or more tests and an environment
 
-    tests: an execution of a test suite from start to finish. has one
-    or more repeditions and an environment
+    tests: an execution of a test from start to finish. has one
+    or more repeditions
 
     test_repetitions: individual executions of a test. can be one or
     many depending on the configuration. each one has individual results
@@ -197,12 +216,21 @@ def init_db(dbconn):
     """
     cur = dbconn.cursor()
     cur.execute(
+        """create table suites (
+                    suite_id text primary key,
+                    start timestamp,
+                    finished timestamp,
+                    name text,
+                    description text);
+                """
+    )
+    cur.execute(
         """create table tests (
                     test_id text primary key,
                     start timestamp,
                     finished timestamp,
                     name text,
-                    runs integer);
+                    kind varchar(10));
                 """
     )
     cur.execute(
@@ -211,7 +239,8 @@ def init_db(dbconn):
                     test_id text,
                     start timestamp,
                     finished timestamp,
-                    returncode integer);
+                    returncode integer,
+                    message text);
                 """
     )
     cur.execute(
@@ -226,7 +255,7 @@ def init_db(dbconn):
     cur.execute(
         """create table environment (
                      env_id integer primary key autoincrement,
-                     test_id text,
+                     suite_id text,
                      key text,
                      value text);
                 """
