@@ -527,10 +527,6 @@ class TestRunner:
         )
 
 
-warp_fast = WarpTest(
-    "mixed-fast", "mixed", ["--duration=10s", "--objects=10", "--concurrent=1"]
-)
-
 warp_mixed_default = WarpTest("mixed-default", "mixed")
 warp_get_default = WarpTest("get-default", "get")
 warp_put_default = WarpTest("put-default", "put")
@@ -552,7 +548,30 @@ test_suites = [
         "demo",
         "Fast demo test suite",
         tests=[
-            warp_fast,
+            WarpTest(
+                "mixed-fast",
+                "mixed",
+                ["--duration=10s", "--objects=10", "--concurrent=1"],
+            ),
+            WarpTest(
+                "get-fast", "get", ["--duration=10s", "--objects=10", "--concurrent=1"]
+            ),
+            WarpTest("put-fast", "put", ["--duration=10s", "--concurrent=1"]),
+            WarpTest(
+                "list-fast",
+                "list",
+                ["--duration=10s", "--objects=10", "--concurrent=1"],
+            ),
+            WarpTest(
+                "delete-fast",
+                "delete",
+                ["--duration=10s", "--objects=10", "--batch=1", "--concurrent=1"],
+            ),
+            WarpTest(
+                "stat-fast",
+                "stat",
+                ["--duration=10s", "--objects=10", "--concurrent=1"],
+            ),
         ],
     ),
     TestSuite(
