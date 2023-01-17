@@ -357,7 +357,11 @@ class WarpTest(ContainerizedTest):
             stderr=True,
             tty=True,
             command=["analyze", "--json", "/warp.out.csv.zst"],
-        ).decode("utf-8")
+        )
+        try:
+            data = data.decode("utf-8")
+        except (UnicodeDecodeError, AttributeError):
+            pass
 
         self.raw_results = data
         self.json_results = self.parse_warp_json(data)
