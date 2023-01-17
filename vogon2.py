@@ -616,6 +616,7 @@ def cli(ctx, debug):
     ctx.obj["DEBUG"] = debug
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARN)
     logging.getLogger("docker.auth").setLevel(logging.INFO)
+    logging.getLogger("docker.utils.config").setLevel(logging.INFO)
 
 
 @cli.command()
