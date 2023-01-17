@@ -10,8 +10,6 @@
       - tmux
       - lshw
       - sqlite3
-      - podman
-      - podman-docker
       - python310
       - python310-setuptools
       - python310-pip
@@ -20,6 +18,7 @@
       - iotop
       - sysstat
       - dstat
+      - docker
     state: present
 
 - name: enable systemd persistent journal
@@ -28,25 +27,15 @@
     mode: "0755"
     state: directory
 
-- name: enable podman service
+- name: docker daemon config
+  copy:
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+
+- name: enable docker service
   ansible.builtin.systemd:
     state: started
-    name: podman
+    name: docker
     enabled: true
     masked: false
-
-- name: make podman run dir accessible
-  ansible.builtin.file:
-    path: '/run/podman'
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-
-- name: make podman socket accessible
-  ansible.builtin.file:
-    path: '/run/podman/podman.sock'
-    state: touch
-    owner: root
-    group: vogon
-    mode: '0660'

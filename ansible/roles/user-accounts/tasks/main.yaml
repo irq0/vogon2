@@ -1,14 +1,16 @@
 ---
-- name: add vogon group
+- name: vogon group
   ansible.builtin.group:
     name: vogon
     state: present
 
-- name: add vogon
+- name: vogon user
   ansible.builtin.user:
     name: vogon
     uid: 1337
-    group: vogon
+    groups:
+      - vogon
+      - docker
     shell: /bin/bash
     password: "!"
 
