@@ -349,6 +349,10 @@ class WarpTest(ContainerizedTest):
 
         data = instance.cri.containers.run(
             self.last_run_image,
+            remove=True,
+            stdout=True,
+            stderr=True,
+            tty=True,
             command=["analyze", "--json", "/warp.out.csv.zst"],
         ).decode("utf-8")
 
