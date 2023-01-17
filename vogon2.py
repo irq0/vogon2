@@ -100,15 +100,22 @@ class Storage:
         self,
         enable_reset_mkfs_mount: bool,
         device: pathlib.Path,
+        partition: pathlib.Path,
         mountpoint: pathlib.Path,
         mkfs_command: list[str],
     ):
         self.enable_reset_mkfs_mount = enable_reset_mkfs_mount
         self.mountpoint = mountpoint
         self.device = device
+        self.partition = partition
         self.mkfs_command = mkfs_command
 
-        logging.info("Storage device: %s mountpoint %s", self.device, self.mountpoint)
+        logging.info(
+            "Storage device: %s, mountpoint %s, partition: %s",
+            self.device,
+            self.mountpoint,
+            self.partition,
+        )
 
         out = subprocess.check_output(
             [
@@ -137,7 +144,7 @@ class Storage:
         try:
             logging.info(
                 f"🛢 resetting storage: mountpoint {self.mountpoint}, "
-                f"dev {self.device}, command {self.mkfs_command}"
+                f"dev {self.partition}, command {self.mkfs_command}"
             )
             try:
                 umount_out = subprocess.check_output(
@@ -152,12 +159,12 @@ class Storage:
 
             time.sleep(1)
             mkfs_out = subprocess.check_output(
-                self.mkfs_command + [str(self.device)], stderr=subprocess.STDOUT
+                self.mkfs_command + [str(self.partition)], stderr=subprocess.STDOUT
             )
             logging.debug("mkfs out: %s", mkfs_out)
 
             mount_out = subprocess.check_output(
-                ["sudo", "mount", str(self.device), str(self.mountpoint.absolute())],
+                ["sudo", "mount", str(self.partition), str(self.mountpoint.absolute())],
                 stderr=subprocess.STDOUT,
             )
             logging.debug("mount out: %s", mount_out)
@@ -668,6 +675,20 @@ def cli(ctx, debug):
         path_type=pathlib.Path,
     ),
     required=True,
+    help="Storage device to extract information from (e.g /dev/disk/by-id/...)",
+)
+@click.option(
+    "--storage-partition",
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
     help="Storage device to run on (e.g /dev/disk/by-id/...)",
 )
 @click.option(
@@ -712,6 +733,7 @@ def test(
     suite,
     archive_dir,
     storage_device,
+    storage_partition,
     mountpoint,
     mkfs,
     docker_api,
@@ -729,7 +751,9 @@ def test(
     cur.close()
 
     db = results_db.ResultsDB(dbconn)
-    storage = Storage(reset_storage, storage_device, mountpoint, mkfs.split())
+    storage = Storage(
+        reset_storage, storage_device, storage_partition, mountpoint, mkfs.split()
+    )
     s3gw = S3GW(cri, under_test_image, storage)
     test_runner = TestRunner(cri, db, s3gw, storage, archive_dir, repeat)
     try:
