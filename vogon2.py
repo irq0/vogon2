@@ -314,7 +314,7 @@ class WarpTest(ContainerizedTest):
         "--benchdata=/warp.out",
     ]
 
-    def __init__(self, name: str, workload: str, args=None):
+    def __init__(self, name: str, workload: str, args: list[str] = []):
         super().__init__(name, self.default_container_image)
         self.workload = workload
         self.args = args
@@ -326,8 +326,7 @@ class WarpTest(ContainerizedTest):
         args.extend(self.default_args)
         args.append(self.workload)
         args.extend(self.default_workload_args)
-        if self.args:
-            args.extend(self.args)
+        args.extend(self.args)
 
         running = self.container.run(command=args, network_mode="host")
         logging.info("🔎 Warp container: %s", running.name)
