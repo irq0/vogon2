@@ -318,6 +318,8 @@ class WarpTest(ContainerizedTest):
         super().__init__(name, self.default_container_image)
         self.workload = workload
         self.args = args
+        self.raw_results: str = ""
+        self.json_results: dict = {}
 
     def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
@@ -333,9 +335,13 @@ class WarpTest(ContainerizedTest):
 
         result = running.wait()
         self.last_run = running
+        self.last_run_image = self.last_run.commit(
+            f"localhost/{self.default_container_image}", f"testrun_{instance.rep_id}"
+        )
+        logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
         try:
-            bits, stat = running.get_archive("/warp.out.csv.zst")
+            bits, stat = self.last_run.get_archive("/warp.out.csv.zst")
             with open(
                 instance.archive / (instance.rep_id + "_warp.out.csv.zst"), "wb"
             ) as fd:
@@ -344,27 +350,34 @@ class WarpTest(ContainerizedTest):
         except docker.errors.NotFound:
             logging.error("warp results file not found. ignoring")
 
+        data = instance.cri.containers.run(
+            self.last_run_image,
+            command=["analyze", "--json", "/warp.out.csv.zst"],
+        ).decode("utf-8")
+
+        self.raw_results = data
+        self.json_results = self.parse_warp_json(data)
+
         return result["StatusCode"]
+
+    def parse_warp_json(self, data: str) -> dict:
+        try:
+            json_start = data.find("{")
+            json_stop = data.rfind("}")
+            jdata = data[json_start : json_stop + 1]
+            return json.loads(jdata)
+        except json.decoder.JSONDecodeError:
+            logging.error("warp result parsing failed. %s", jdata, exc_info=True)
+            return {}
 
     def results(self, instance: "TestRunner"):
         results = []
         if not self.last_run:
             return None
 
-        try:
-            data = self.last_run.logs(stdout=True, stderr=False, stream=False).decode(
-                "utf-8"
-            )
-            json_start = data.find("{")
-            json_stop = data.rfind("}")
-            jdata = data[json_start : json_stop + 1]
-            results.append(("JSON", jdata, "JSON"))
-            d = json.loads(jdata)
-        except json.decoder.JSONDecodeError:
-            logging.error("warp result parsing failed. %s", jdata, exc_info=True)
-            return results
+        results.append(("JSON", self.raw_results, "JSON"))
 
-        for op in d["operations"]:
+        for op in self.json_results["operations"]:
             prefix = op["type"] + "_"
             results.append(
                 (prefix + "avg-ops", op["throughput"]["average_ops"], "ops/s")
