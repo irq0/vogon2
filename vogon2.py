@@ -150,6 +150,7 @@ class Storage:
                 if b"not mounted" not in e.output:
                     raise e
 
+            time.sleep(1)
             mkfs_out = subprocess.check_output(
                 self.mkfs_command + [str(self.device)], stderr=subprocess.STDOUT
             )
