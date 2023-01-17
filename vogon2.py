@@ -431,20 +431,20 @@ class TestRunner:
         self.db.save_test_environment(self.suite_id, self.storage.env())
 
         for test in suite.tests:
-            self.run_test(self.suite_id, test)
+            self.run_test(test)
 
         self.db.save_after_suite(self.suite_id)
 
     def run_test(self, test: Test):
         self.test_id = results_db.make_id()
 
-        self.db.save_before_test(self.test_id, str(test), test.kind())
+        self.db.save_before_test(self.suite_id, self.test_id, str(test), test.kind())
         logging.info(f"🔎 TEST {test} ID {self.test_id}")
 
         for rep in range(self.reps):
             logging.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
             try:
-                self.run_test_rep(test, rep)
+                self.run_test_rep(test)
             except Exception:
                 logging.exception(
                     "😥 TEST %s REP %s/%s FAILED. Continuing with next test in suite",
@@ -458,7 +458,7 @@ class TestRunner:
         self.db.save_after_test(self.test_id)
         self.db.save_test_environment(self.suite_id, test.env(self), test.name + "-")
 
-    def run_test_rep(self, test, rep):
+    def run_test_rep(self, test: Test):
         self.rep_id = results_db.make_id()
         self.db.save_before_rep(self.test_id, self.rep_id)
         self.storage.reset()

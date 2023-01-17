@@ -142,12 +142,14 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_before_test(self, test_id: IDType, test_name: str, kind: str):
+    def save_before_test(
+        self, suite_id: IDType, test_id: IDType, test_name: str, kind: str
+    ):
         cur = self.db.cursor()
         cur.execute(
-            """insert into tests (test_id, start, name)
-                                    values (?, strftime('%Y-%m-%d %H:%M:%f'), ?);""",
-            (test_id, test_name),
+            """insert into tests (suite_id, test_id, start, name)
+                                    values (?, ?, strftime('%Y-%m-%d %H:%M:%f'), ?);""",
+            (suite_id, test_id, test_name),
         )
         self.db.commit()
         cur.close()
@@ -216,49 +218,64 @@ def init_db(dbconn):
     """
     cur = dbconn.cursor()
     cur.execute(
-        """create table suites (
-                    suite_id text primary key,
-                    start timestamp,
-                    finished timestamp,
-                    name text,
-                    description text);
-                """
+        """
+        create table suites (
+          suite_id text primary key,
+          start timestamp,
+          finished timestamp,
+          name text,
+          description text
+        );
+        """
     )
     cur.execute(
-        """create table tests (
-                    test_id text primary key,
-                    start timestamp,
-                    finished timestamp,
-                    name text,
-                    kind varchar(10));
-                """
+        """
+        create table tests (
+          test_id text primary key,
+          suite_id text,
+          start timestamp,
+          finished timestamp,
+          name text,
+          kind varchar(10),
+          foreign key(suite_id) references suites(suite_id)
+        );
+        """
     )
     cur.execute(
-        """create table test_repetitions (
-                    rep_id text primary key,
-                    test_id text,
-                    start timestamp,
-                    finished timestamp,
-                    returncode integer,
-                    message text);
-                """
+        """
+        create table test_repetitions (
+          rep_id text primary key,
+          test_id text,
+          start timestamp,
+          finished timestamp,
+          returncode integer,
+          message text,
+          foreign key(test_id) references tests(test_id)
+        );
+        """
     )
     cur.execute(
-        """create table results (
-                     result_id integer primary key autoincrement,
-                     rep_id text,
-                     key text,
-                     value text,
-                     unit varchar(20));
-                """
+        """
+        create table results (
+          result_id integer primary key autoincrement,
+          rep_id text,
+          key text,
+          value text,
+          unit varchar(20),
+          foreign key(rep_id) references test_repetitions(rep_id)
+        );
+        """
     )
     cur.execute(
-        """create table environment (
-                     env_id integer primary key autoincrement,
-                     suite_id text,
-                     key text,
-                     value text);
-                """
+        """
+        create table environment (
+          env_id integer primary key autoincrement,
+          suite_id text,
+          key text,
+          value text,
+          foreign key(suite_id) references suites(suite_id)
+        );
+        """
     )
     cur.close()
 
