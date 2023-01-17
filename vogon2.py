@@ -326,7 +326,9 @@ class WarpTest(ContainerizedTest):
         args.extend(self.default_workload_args)
         args.extend(self.args)
 
-        running = self.container.run(command=args, network_mode="host")
+        running = self.container.run(
+            command=args, network_mode="host", name=f"warp_{instance.rep_id}"
+        )
         logging.info("🔎 Warp container: %s", running.name)
 
         result = running.wait()
@@ -343,7 +345,7 @@ class WarpTest(ContainerizedTest):
             logging.error("warp results file not found. ignoring")
 
         self.last_run_image = self.last_run.commit(
-            f"localhost/{self.default_container_image}", f"testrun_{instance.rep_id}"
+            f"localhost/{self.default_container_image}", f"test_rep_{instance.rep_id}"
         )
         logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
@@ -479,7 +481,7 @@ class TestRunner:
         self.storage.reset()
 
         logging.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
-        self.under_test_container.run()
+        self.under_test_container.run(name=f"under_test_{self.rep_id}")
         self.save_under_test_container_env_once()
 
         # TODO be smarter about the started condition
