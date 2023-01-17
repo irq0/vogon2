@@ -302,12 +302,8 @@ class FIOTest(HostTest):
 
 class WarpTest(ContainerizedTest):
     default_container_image = "minio/warp"
-    default_args = [
-        "--no-color",
-        "--json",
-    ]
+    default_args = ["--no-color"]
     default_workload_args = [
-        "--json",
         "--host=localhost:7480",
         "--access-key=test",
         "--secret-key=test",
@@ -368,7 +364,8 @@ class WarpTest(ContainerizedTest):
             jdata = data[json_start : json_stop + 1]
             return json.loads(jdata)
         except json.decoder.JSONDecodeError:
-            logging.error("warp result parsing failed. %s", jdata, exc_info=True)
+            logging.error("warp result parsing failed.", exc_info=True)
+            logging.error("data:\n %s", jdata, exc_info=True)
             return {}
 
     def results(self, instance: "TestRunner"):
@@ -378,7 +375,7 @@ class WarpTest(ContainerizedTest):
 
         results.append(("JSON", self.raw_results, "JSON"))
 
-        for op in self.json_results["operations"]:
+        for op in self.json_results.get("operations", []):
             prefix = op["type"] + "_"
             results.append(
                 (prefix + "avg-ops", op["throughput"]["average_ops"], "ops/s")
