@@ -4,6 +4,7 @@ import logging
 import pathlib
 import sqlite3
 import subprocess
+import tarfile
 import time
 from typing import Any
 
@@ -345,7 +346,7 @@ class WarpTest(ContainerizedTest):
         try:
             bits, stat = self.last_run.get_archive("/warp.out.csv.zst")
             with open(
-                instance.archive / (instance.rep_id + "_warp.out.csv.zst"), "wb"
+                instance.archive / (instance.rep_id + "_warp.out.csv.zst.tar"), "wb"
             ) as fd:
                 for chunk in bits:
                     fd.write(chunk)
@@ -357,34 +358,49 @@ class WarpTest(ContainerizedTest):
         )
         logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
+        # this looks like a lot of work and it is. unfortunately using
+        # the logger was not reliable enaugh for large json
         container = instance.cri.containers.run(
             self.last_run_image,
             detach=True,
-            tty=True,
-            command=["analyze", "--json", "/warp.out.csv.zst"],
+            entrypoint="/bin/sh",
+            command=["-c", "/warp analyze --json /warp.out.csv.zst > /warp.json"],
         )
+        logging.info("🔨 extracting warp results. container: %s", container)
         container.wait()
-        data = container.logs()
+
+        results_tarball = instance.archive / (instance.rep_id + "_warp.json.tar")
         try:
-            data = data.decode("utf-8")
-        except (UnicodeDecodeError, AttributeError):
-            pass
+            bits, stat = container.get_archive("/warp.json")
+            with open(results_tarball, "wb") as fd:
+                for chunk in bits:
+                    fd.write(chunk)
+        except docker.errors.NotFound as e:
+            logging.error("warp.json not found. no results. failing")
+            raise e
 
-        self.raw_results = data
-        self.json_results = self.parse_warp_json(data)
+        with tarfile.open(results_tarball) as tf:
+            for entry in tf:
+                fp = tf.extractfile(entry)
+                if not fp:
+                    continue
+                data = fp.read()
+                json_start = data.find(b"{")
+                json_stop = data.rfind(b"}")
+                try:
+                    jdata = data[json_start : json_stop + 1].decode("utf-8")
+                except (UnicodeDecodeError, AttributeError):
+                    break
 
-        return result["StatusCode"]
-
-    def parse_warp_json(self, data: str) -> dict:
+        self.raw_results = jdata
         try:
-            json_start = data.find("{")
-            json_stop = data.rfind("}")
-            jdata = data[json_start : json_stop + 1]
-            return json.loads(jdata)
+            self.json_results = json.loads(data)
         except json.decoder.JSONDecodeError:
             logging.error("warp result parsing failed.", exc_info=True)
-            logging.error("data:\n %s", jdata, exc_info=True)
-            return {}
+            logging.error("data:\n %s", data, exc_info=True)
+            self.json_results = {}
+
+        return result["StatusCode"]
 
     def results(self, instance: "TestRunner"):
         results = []
