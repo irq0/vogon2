@@ -262,7 +262,8 @@ def init_db(dbconn):
           key text,
           value text,
           unit varchar(20),
-          foreign key(rep_id) references test_repetitions(rep_id)
+          foreign key(rep_id) references test_repetitions(rep_id),
+          unique(rep_id, key, unit) on conflict replace
         );
         """
     )
@@ -273,7 +274,8 @@ def init_db(dbconn):
           suite_id text,
           key text,
           value text,
-          foreign key(suite_id) references suites(suite_id)
+          foreign key(suite_id) references suites(suite_id),
+          unique(suite_id, key) on conflict replace
         );
         """
     )
