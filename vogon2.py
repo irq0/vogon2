@@ -357,14 +357,14 @@ class WarpTest(ContainerizedTest):
         )
         logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
-        data = instance.cri.containers.run(
+        container = instance.cri.containers.run(
             self.last_run_image,
-            remove=True,
-            stdout=True,
-            stderr=True,
+            detach=True,
             tty=True,
             command=["analyze", "--json", "/warp.out.csv.zst"],
         )
+        container.wait()
+        data = container.logs()
         try:
             data = data.decode("utf-8")
         except (UnicodeDecodeError, AttributeError):
