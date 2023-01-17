@@ -335,10 +335,6 @@ class WarpTest(ContainerizedTest):
 
         result = running.wait()
         self.last_run = running
-        self.last_run_image = self.last_run.commit(
-            f"localhost/{self.default_container_image}", f"testrun_{instance.rep_id}"
-        )
-        logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
         try:
             bits, stat = self.last_run.get_archive("/warp.out.csv.zst")
@@ -349,6 +345,11 @@ class WarpTest(ContainerizedTest):
                     fd.write(chunk)
         except docker.errors.NotFound:
             logging.error("warp results file not found. ignoring")
+
+        self.last_run_image = self.last_run.commit(
+            f"localhost/{self.default_container_image}", f"testrun_{instance.rep_id}"
+        )
+        logging.info("🔎 Commited warp run container to %s", self.last_run_image)
 
         data = instance.cri.containers.run(
             self.last_run_image,
