@@ -682,6 +682,10 @@ def test(
     dbconn = sqlite3.connect(sqlite)
     if init_db:
         results_db.init_db(dbconn)
+    cur = dbconn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+    cur.close()
+
     db = results_db.ResultsDB(dbconn)
     storage = Storage(reset_storage, storage_device, mountpoint, mkfs.split())
     s3gw = S3GW(cri, under_test_image, storage)
