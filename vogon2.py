@@ -336,7 +336,9 @@ class WarpTest(ContainerizedTest):
 
         try:
             bits, stat = running.get_archive("/warp.out.csv.zst")
-            with open(instance.archive / "warp.out.csv.zst", "wb") as fd:
+            with open(
+                instance.archive / (instance.rep_id + "_warp.out.csv.zst"), "wb"
+            ) as fd:
                 for chunk in bits:
                     fd.write(chunk)
         except docker.errors.NotFound:
@@ -413,32 +415,36 @@ class TestRunner:
 
         self.under_test_container_env_saved = False
 
+        self.suite_id = "NA"
+        self.test_id = "NA"
+        self.rep_id = "NA"
+
     def __str__(self):
-        return f"TestSuite(name={self.suite_name}, id={self.suite_id})"
+        return f"TestSuite(name={self.suite_name}, suite_id={self.suite_id})"
 
     def run_suite(self, suite):
-        suite_id = results_db.make_id()
-        logging.info(f"▶️ STARTING TEST SUITE {suite.name} ID {suite_id}")
+        self.suite_id = results_db.make_id()
+        logging.info(f"▶️ STARTING TEST SUITE {suite.name} ID {self.suite_id}")
         logging.info(f"♻️ {self.reps} REPS / TEST")
-        self.db.save_before_suite(suite_id, suite.name, suite.description)
-        self.db.save_test_environment_default(suite_id)
-        self.db.save_test_environment(suite_id, self.storage.env())
+        self.db.save_before_suite(self.suite_id, suite.name, suite.description)
+        self.db.save_test_environment_default(self.suite_id)
+        self.db.save_test_environment(self.suite_id, self.storage.env())
 
         for test in suite.tests:
-            self.run_test(suite_id, test)
+            self.run_test(self.suite_id, test)
 
-        self.db.save_after_suite(suite_id)
+        self.db.save_after_suite(self.suite_id)
 
-    def run_test(self, suite_id, test: Test):
-        test_id = results_db.make_id()
+    def run_test(self, test: Test):
+        self.test_id = results_db.make_id()
 
-        self.db.save_before_test(test_id, str(test), test.kind())
-        logging.info(f"🔎 TEST {test} ID {test_id}")
+        self.db.save_before_test(self.test_id, str(test), test.kind())
+        logging.info(f"🔎 TEST {test} ID {self.test_id}")
 
         for rep in range(self.reps):
             logging.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
             try:
-                self.run_test_rep(suite_id, test_id, test, rep)
+                self.run_test_rep(test, rep)
             except Exception:
                 logging.exception(
                     "😥 TEST %s REP %s/%s FAILED. Continuing with next test in suite",
@@ -449,17 +455,17 @@ class TestRunner:
                 )
                 return
 
-        self.db.save_after_test(test_id)
-        self.db.save_test_environment(suite_id, test.env(self), test.name + "-")
+        self.db.save_after_test(self.test_id)
+        self.db.save_test_environment(self.suite_id, test.env(self), test.name + "-")
 
-    def run_test_rep(self, suite_id, test_id, test, rep):
-        rep_id = results_db.make_id()
-        self.db.save_before_rep(test_id, rep_id)
+    def run_test_rep(self, test, rep):
+        self.rep_id = results_db.make_id()
+        self.db.save_before_rep(self.test_id, self.rep_id)
         self.storage.reset()
 
-        logging.info("🔎️ TEST %s REP ID %s", test.name, rep_id)
+        logging.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
         self.under_test_container.run()
-        self.save_under_test_container_env_once(suite_id)
+        self.save_under_test_container_env_once()
 
         # TODO be smarter about the started condition
         time.sleep(10)
@@ -471,23 +477,23 @@ class TestRunner:
             logging.exception(
                 "😥 TEST %s REP ID %s failed with exception: %s",
                 test.name,
-                rep_id,
+                self.rep_id,
                 e,
                 exc_info=True,
             )
 
-            self.db.save_after_rep(rep_id, -10, f"failed with exception: {str(e)}")
+            self.db.save_after_rep(self.rep_id, -10, f"failed with exception: {str(e)}")
             raise e
 
         if returncode != 0:
             logging.error(
                 "😥 TEST %s REP ID %s finished with returncode != 0: %s",
                 test.name,
-                rep_id,
+                self.rep_id,
                 returncode,
             )
             self.db.save_after_rep(
-                rep_id, returncode, "failed with non-zero return code"
+                self.rep_id, returncode, "failed with non-zero return code"
             )
             raise AbortTest
 
@@ -497,27 +503,27 @@ class TestRunner:
             logging.exception(
                 "😥 TEST %s REP ID %s" " result parsing failed with exception: %s",
                 test.name,
-                rep_id,
+                self.rep_id,
                 e,
                 exc_info=True,
             )
             self.db.save_after_rep(
-                rep_id, -20, f"result parser returned exception: {str(e)}"
+                self.rep_id, -20, f"result parser returned exception: {str(e)}"
             )
             raise e
 
-        self.db.save_after_rep(rep_id, returncode, "successful")
-        self.db.save_test_results(rep_id, results)
+        self.db.save_after_rep(self.rep_id, returncode, "successful")
+        self.db.save_test_results(self.rep_id, results)
 
         self.under_test_container.terminate()
 
-    def save_under_test_container_env_once(self, suite_id):
+    def save_under_test_container_env_once(self):
         # call this after first run() - under test container usually
         # has env data avail afterwards
         if self.under_test_container_env_saved:
             return
         self.db.save_test_environment(
-            suite_id, self.under_test_container.env(), "under-test-"
+            self.suite_id, self.under_test_container.env(), "under-test-"
         )
 
 
