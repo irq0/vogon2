@@ -76,7 +76,7 @@ class S3GW(ContainerManager):
     ):
         self.storage = storage
         self.s3gw_version = "unknown"
-        super().__init__(cri, image)
+        super().__init__(cri, image, pull_image)
 
     def run(self, **args):
         self.container = self.cri.containers.run(
