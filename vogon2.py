@@ -326,6 +326,7 @@ class WarpTest(ContainerizedTest):
         "--host=localhost:7480",
         "--access-key=test",
         "--secret-key=test",
+        "--noclear",  # vogon restarts and runs mkfs between runs
         "--benchdata=/warp.out",
     ]
 
