@@ -19,6 +19,7 @@
       - sysstat
       - dstat
       - docker
+      - ccache
     state: present
 
 - name: enable systemd persistent journal
