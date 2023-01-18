@@ -24,10 +24,16 @@ class ContainerManager:
     run, terminate, retrieve logs and test environment data
     """
 
-    def __init__(self, cri: docker.DockerClient, image: DockerImageType):
+    def __init__(
+        self, cri: docker.DockerClient, image: DockerImageType, pull_image: bool = True
+    ):
         self.cri = cri
-        self.image = self.cri.images.pull(image)
-        logging.debug("Pulled %s", self.image)
+        if pull_image:
+            self.image = self.cri.images.pull(image)
+            logging.debug("Pulling image %s", self.image)
+        else:
+            self.image = self.cri.images.get(image)
+            logging.debug("Using image %s", self.image)
 
     def run(self, **kwargs) -> docker.models.containers.Container:
         """wrap docker client run(). runs detached and set
@@ -62,7 +68,11 @@ class ContainerManager:
 
 class S3GW(ContainerManager):
     def __init__(
-        self, cri: docker.DockerClient, image: DockerImageType, storage: "Storage"
+        self,
+        cri: docker.DockerClient,
+        image: DockerImageType,
+        pull_image: bool,
+        storage: "Storage",
     ):
         self.storage = storage
         self.s3gw_version = "unknown"
@@ -660,6 +670,11 @@ def cli(ctx, debug):
     help="Docker image of the application under test",
 )
 @click.option(
+    "--under-test-image-pull/--no-under-test-image-pull",
+    default=False,
+    help="Pull under test image?",
+)
+@click.option(
     "--suite",
     type=click.Choice(list(test_suites_indexed.keys())),
     required=True,
@@ -746,6 +761,7 @@ def cli(ctx, debug):
 def test(
     ctx,
     under_test_image,
+    under_test_image_pull,
     suite,
     archive_dir,
     storage_device,
@@ -770,7 +786,7 @@ def test(
     storage = Storage(
         reset_storage, storage_device, storage_partition, mountpoint, mkfs.split()
     )
-    s3gw = S3GW(cri, under_test_image, storage)
+    s3gw = S3GW(cri, under_test_image, under_test_image_pull, storage)
     test_runner = TestRunner(cri, db, s3gw, storage, archive_dir, repeat)
     try:
         test_runner.run_suite(test_suites_indexed[suite])
