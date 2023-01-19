@@ -440,6 +440,7 @@ class WarpTest(ContainerizedTest):
     def env(self, instance: "TestRunner"):
         env = self.container.env()
         env["warp-version"] = self.warp_version
+        env[self.name + "-args"] = " ".join(self.args)
         return env
 
     def kind(self) -> str:
