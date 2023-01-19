@@ -147,9 +147,9 @@ class ResultsDB:
     ):
         cur = self.db.cursor()
         cur.execute(
-            """insert into tests (suite_id, test_id, start, name)
-                                    values (?, ?, strftime('%Y-%m-%d %H:%M:%f'), ?);""",
-            (suite_id, test_id, test_name),
+            """insert into tests (suite_id, test_id, start, name, kind)
+               values (?, ?, strftime('%Y-%m-%d %H:%M:%f'), ?, ?);""",
+            (suite_id, test_id, test_name, kind),
         )
         self.db.commit()
         cur.close()
