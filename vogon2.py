@@ -339,7 +339,7 @@ class WarpTest(ContainerizedTest):
 
     def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
-        self.warp_version = self.container.run_once(command="--version")
+        self.warp_version = self.container.run_once(command="--version").strip()
         args = []
         args.extend(self.default_args)
         args.append(self.workload)
