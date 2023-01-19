@@ -1111,8 +1111,10 @@ def compare(ctx, suite_a, suite_b):
                 va, vb = float(a[1]), float(b[1])
                 unit = a[2]
                 if va > 0:
-                    value = f"{vb/va:1.2f}x"
-                    f"\n{format_value(va, unit)}￫{format_value(vb, unit)}"
+                    value = (
+                        f"{vb/va:1.2f}x"
+                        f"\n{format_value(va, unit)}￫{format_value(vb, unit)}"
+                    )
                 else:
                     value = "-"
             except Exception:
