@@ -1,0 +1,15 @@
+; assume 300G disk, 64G RAM
+[global]
+name=fio-rand-read
+filename=fio-rand-read
+rw=randread
+bs=4K
+direct=0
+numjobs=20
+time_based
+runtime=600
+
+[file1]
+size=15G
+ioengine=libaio
+iodepth=20

@@ -596,14 +596,14 @@ warp_list_default = WarpTest("list-default", "list")
 warp_delete_default = WarpTest("delete-default", "delete")
 warp_stat_default = WarpTest("stat-default", "stat")
 
-fio_sfs_like = FIOTest("fio-sfs-like", SCRIPT_PATH / "fio" / "sfs-like_10M-files.fio")
-
 test_suites = [
     TestSuite(
         "baseline",
         "Test disk baseline performance",
         tests=[
-            fio_sfs_like,
+            FIOTest("fio-rand-RW", SCRIPT_PATH / "fio" / "fio-rand-RW.fio"),
+            FIOTest("fio-rand-read", SCRIPT_PATH / "fio" / "fio-rand-read.fio"),
+            FIOTest("fio.rand-write", SCRIPT_PATH / "fio" / "fio-rand-write.fio"),
         ],
     ),
     TestSuite(

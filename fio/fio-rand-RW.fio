@@ -1,0 +1,17 @@
+; assume 300G disk, 64G RAM
+[global]
+name=fio-rand-RW
+filename=fio-rand-RW
+rw=randrw
+rwmixread=70
+rwmixwrite=30
+bs=4K
+direct=0
+numjobs=4
+time_based
+runtime=600
+
+[file1]
+size=64G
+ioengine=libaio
+iodepth=16
