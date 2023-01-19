@@ -849,7 +849,7 @@ def select_print_table(db, sql, params=()):
 
 @report.command()
 @click.pass_context
-def list_testruns(ctx):
+def testruns(ctx):
     "List testruns"
     select_print_table(
         ctx.obj["db"],
