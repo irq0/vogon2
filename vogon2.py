@@ -512,7 +512,7 @@ class TestRunner:
                 return
 
         self.db.save_after_test(self.test_id)
-        self.db.save_test_environment(self.suite_id, test.env(self), test.name + "-")
+        self.db.save_test_environment(self.suite_id, test.env(self), "test-")
 
     def run_test_rep(self, test: Test):
         self.rep_id = results_db.make_id()
