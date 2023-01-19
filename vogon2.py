@@ -903,6 +903,7 @@ def show(ctx, suite_id):
     row = cur.execute(
         """
         SELECT
+        suites.suite_id,
         suites.name,
         suites.start,
         suites.finished,
@@ -1084,7 +1085,7 @@ def compare(ctx, suite_a, suite_b):
         show_header=True,
         box=rich.box.SIMPLE,
         highlight=True,
-        caption=f"Test result comparison. {suite_a} vs {suite_b}",
+        caption=f"Test result comparison. {suite_a} ￫ {suite_b}",
     )
 
     cols = cols.a
