@@ -648,7 +648,24 @@ test_suites = [
             warp_stat_default,
         ],
     ),
+    TestSuite(
+        "warp-mixed-long",
+        "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
+        tests=[
+            WarpTest(
+                "mixed-30m-default",
+                "mixed",
+                ["--duration=30m"],
+            ),
+            WarpTest(
+                "mixed-30m-get-put",
+                "mixed",
+                ["--duration=30m", "--get-distrib=70", "--put-distrib=30"],
+            ),
+        ],
+    ),
 ]
+
 
 test_suites_indexed = {suite.name: suite for suite in test_suites}
 
