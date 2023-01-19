@@ -1,15 +1,15 @@
-; assume 300G disk, 64G RAM
+; assume 300G disk, 64G RAM, 8 CPUs, 128 device queues
 [global]
 name=fio-rand-write
 filename=fio-rand-write
 rw=randwrite
 bs=4K
 direct=0
-numjobs=4
+numjobs=8
 time_based
 runtime=600
 
 [file1]
-size=64G
+size=32G
 ioengine=libaio
-iodepth=20
+iodepth=16
