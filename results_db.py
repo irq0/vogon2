@@ -4,7 +4,7 @@ import sqlite3
 import typing
 import uuid
 
-from cpuinfo import get_cpu_info
+import cpuinfo
 
 IDType = str
 TestResultType = tuple[str, str, str]
@@ -66,18 +66,12 @@ class ResultsDB:
         Save default test environment with information about the machine and test runner
         """
 
-        env = {}
+        env = cpuinfo.get_cpu_info()
         env["machine_type"] = platform.machine()
         env["os"] = platform.system()
         env["os-release"] = platform.release()
         env["os-version"] = platform.version()
         env["node-name"] = platform.node()
-        cpuinfo = get_cpu_info()
-        env["cpu-brand"] = cpuinfo["brand_raw"]
-        env["arch"] = cpuinfo["arch"]
-        env["cpu-freq"] = cpuinfo["hz_advertised_friendly"]
-        env["cpu-count"] = cpuinfo["count"]
-        env["cpu-flags"] = " ".join(cpuinfo["flags"])
 
         dist = platform.freedesktop_os_release()
         env["vogon_dist_name"] = dist["NAME"]
