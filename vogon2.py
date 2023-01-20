@@ -312,9 +312,9 @@ class FIOTest(HostTest):
         return [
             ("JSON", self.json, "JSON"),
             ("read-iops", j["read"]["iops"], "iops"),
-            ("read-bw", j["read"]["bw_bytes"], "byte"),
+            ("read-bw", j["read"]["bw_bytes"], "byte/s"),
             ("write-iops", j["read"]["iops"], "iops"),
-            ("write-bw", j["read"]["bw_bytes"], "byte"),
+            ("write-bw", j["read"]["bw_bytes"], "byte/s"),
         ]
 
     def kind(self) -> str:
