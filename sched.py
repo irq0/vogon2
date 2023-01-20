@@ -62,7 +62,7 @@ class Job:
 
     def run(self, config):
         env = config["environment"] | self.environment
-        if "virtualenv" in config:
+        if "virtualenv" in config.keys():
             command = [
                 pathlib.Path(config["virtualenv"]) / "bin" / "python",
                 SCRIPT_PATH / "vogon2.py",
@@ -72,7 +72,7 @@ class Job:
         else:
             command = [SCRIPT_PATH / "vogon2.py", "--debug", "test"]
 
-        LOG.info(f"running {self} with env {env}")
+        LOG.info(f"running {self} command {command} with env {env}")
 
         try:
             proc = subprocess.run(command, env=env, check=True)
@@ -156,8 +156,7 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
         try:
             with open(config_file) as fd:
                 config = json.load(fd)
-
-                LOG.debug("read config {config_file}: {config}")
+                LOG.debug(f"read config {config_file}: {config}")
         except json.decoder.JSONDecodeError:
             LOG.error(f"JSON error in config file {config_file}. retrying load in 10s")
             time.sleep(10)
