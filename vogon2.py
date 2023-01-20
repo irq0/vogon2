@@ -1087,16 +1087,21 @@ def results(ctx, suite_id):
 def result(ctx, rep_id, key):
     "Get single result value"
     cur = ctx.obj["db"].cursor()
-    print(
-        cur.execute(
-            """
-    SELECT value
-    FROM results
-    WHERE rep_id = ? and key = ?
-    """,
-            (rep_id, key),
-        ).fetchone()[0]
-    )
+    data = cur.execute(
+        """
+        SELECT value
+        FROM results
+        WHERE rep_id = ? and key = ?
+        """,
+        (rep_id, key),
+    ).fetchone()
+    try:
+        out = data[0].decode("utf-8")
+    except (UnicodeDecodeError, AttributeError):
+        out = data[0]
+
+    console = Console()
+    console.print(out)
 
 
 class IncompatibleSuites(Exception):
