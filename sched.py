@@ -75,8 +75,7 @@ class Job:
         LOG.info(f"running {self} command {command} with env {env}")
         LOG.info(">" * 42)
         try:
-            proc = subprocess.run(command, env=env, check=True)
-            proc.wait()
+            subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             LOG.error(f"vogon call failed with {e.returncode}")
             raise e
