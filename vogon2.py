@@ -14,11 +14,13 @@ import docker
 import rich
 from rich import print as pprint
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.table import Table
 
 import results_db
 
 SCRIPT_PATH = pathlib.Path(__file__).parent
+LOG = logging.getLogger("vogon")
 
 
 DockerImageType = str
@@ -35,19 +37,17 @@ class ContainerManager:
         self.cri = cri
         if pull_image:
             self.image = self.cri.images.pull(image)
-            logging.debug("Pulling image %s", self.image)
+            LOG.debug("Pulling image %s", self.image)
         else:
             self.image = self.cri.images.get(image)
-            logging.debug("Using image %s", self.image)
+            LOG.debug("Using image %s", self.image)
 
     def run(self, **kwargs) -> docker.models.containers.Container:
         """wrap docker client run(). runs detached and set
         self.container to the started container. forward args"""
 
         self.container = self.cri.containers.run(self.image.id, detach=True, **kwargs)
-        logging.debug(
-            "Started container for image %s: %s", self.image, self.container.name
-        )
+        LOG.debug("Started container for image %s: %s", self.image, self.container.name)
         return self.container
 
     def run_once(self, **kwargs) -> str:
@@ -57,7 +57,7 @@ class ContainerManager:
     def terminate(self):
         "terminate container started with run()"
         res = self.container.stop(timeout=30)
-        logging.info("Terminating container %s: %s", self.container, res)
+        LOG.info("Terminating container %s: %s", self.container, res)
 
     def logs(self, **kwargs) -> bytes:
         "get logs of container started with run()"
@@ -100,7 +100,7 @@ class S3GW(ContainerManager):
         if ret == 0:
             self.s3gw_version = version
 
-        logging.info("🔎 S3GW container: %s", self.container.name)
+        LOG.info("🔎 S3GW container: %s", self.container.name)
         return self.container
 
     def env(self):
@@ -126,7 +126,7 @@ class Storage:
         self.partition = partition
         self.mkfs_command = mkfs_command
 
-        logging.info(
+        LOG.info(
             "Storage device: %s, mountpoint %s, partition: %s",
             self.device,
             self.mountpoint,
@@ -143,7 +143,7 @@ class Storage:
             ]
         )
         d = json.loads(out)["blockdevices"][0]
-        logging.info("Device: %s", d)
+        LOG.info("Device: %s", d)
         self.env_data = {
             "disk-dev-name": d["name"],
             "disk-model": d["model"],
@@ -155,10 +155,10 @@ class Storage:
 
     def reset(self):
         if not self.enable_reset_mkfs_mount:
-            logging.info("🛢 storage reset disabled. skipping umount, mkfs, mount")
+            LOG.info("🛢 storage reset disabled. skipping umount, mkfs, mount")
             return
         try:
-            logging.info(
+            LOG.info(
                 f"🛢 resetting storage: mountpoint {self.mountpoint}, "
                 f"dev {self.partition}, command {self.mkfs_command}"
             )
@@ -167,7 +167,7 @@ class Storage:
                     ["sudo", "umount", str(self.mountpoint.absolute())],
                     stderr=subprocess.STDOUT,
                 )
-                logging.debug("umount: %s", umount_out)
+                LOG.debug("umount: %s", umount_out)
             except subprocess.CalledProcessError as e:
                 # on first run mountpoint is typically not mounted
                 if b"not mounted" not in e.output:
@@ -177,22 +177,22 @@ class Storage:
             mkfs_out = subprocess.check_output(
                 self.mkfs_command + [str(self.partition)], stderr=subprocess.STDOUT
             )
-            logging.debug("mkfs out: %s", mkfs_out)
+            LOG.debug("mkfs out: %s", mkfs_out)
 
             mount_out = subprocess.check_output(
                 ["sudo", "mount", str(self.partition), str(self.mountpoint.absolute())],
                 stderr=subprocess.STDOUT,
             )
-            logging.debug("mount out: %s", mount_out)
+            LOG.debug("mount out: %s", mount_out)
 
             chown_out = subprocess.check_output(
                 ["sudo", "chown", "vogon:vogon", self.mountpoint],
                 stderr=subprocess.STDOUT,
             )
-            logging.debug("chown out: %s", chown_out)
+            LOG.debug("chown out: %s", chown_out)
 
         except subprocess.CalledProcessError as e:
-            logging.exception(
+            LOG.exception(
                 "storage reset (umount,mkfs,mount) failed with exit %s out %s. "
                 "failing benchmark",
                 e.returncode,
@@ -211,7 +211,7 @@ class Storage:
                 ["sudo", "bash", "-c", "echo 3 > /proc/sys/vm/drop_caches"]
             )
         except subprocess.CalledProcessError as e:
-            logging.exception("os cached drop failed. failing benchmark")
+            LOG.exception("os cached drop failed. failing benchmark")
             raise e
 
 
@@ -285,7 +285,7 @@ class FIOTest(HostTest):
 
     def run(self, instance: "TestRunner"):
         try:
-            logging.info(
+            LOG.info(
                 "running fio with job file %s in %s",
                 self.job_file,
                 instance.storage.mountpoint,
@@ -301,7 +301,7 @@ class FIOTest(HostTest):
                 cwd=instance.storage.mountpoint,
             )
         except subprocess.CalledProcessError:
-            logging.exception("fio crashed :()", exc_info=True)
+            LOG.exception("fio crashed :()", exc_info=True)
             return -1
 
         self.data = json.loads(out)
@@ -366,7 +366,7 @@ class WarpTest(ContainerizedTest):
         running = self.container.run(
             command=args, network_mode="host", name=f"warp_{instance.rep_id}"
         )
-        logging.info("🔎 Warp container: %s", running.name)
+        LOG.info("🔎 Warp container: %s", running.name)
 
         result = running.wait()
         self.last_run = running
@@ -379,12 +379,12 @@ class WarpTest(ContainerizedTest):
                 for chunk in bits:
                     fd.write(chunk)
         except docker.errors.NotFound:
-            logging.error("warp results file not found. ignoring")
+            LOG.error("warp results file not found. ignoring")
 
         self.last_run_image = self.last_run.commit(
             f"localhost/{self.default_container_image}", f"test_rep_{instance.rep_id}"
         )
-        logging.info("🔎 Commited warp run container to %s", self.last_run_image)
+        LOG.info("🔎 Commited warp run container to %s", self.last_run_image)
 
         # this looks like a lot of work and it is. unfortunately using
         # the logger was not reliable enaugh for large json
@@ -394,7 +394,7 @@ class WarpTest(ContainerizedTest):
             entrypoint="/bin/sh",
             command=["-c", "/warp analyze --json /warp.out.csv.zst > /warp.json"],
         )
-        logging.info("🔨 extracting warp results. container: %s", container)
+        LOG.info("🔨 extracting warp results. container: %s", container)
         container.wait()
 
         results_tarball = instance.archive / (instance.rep_id + "_warp.json.tar")
@@ -404,7 +404,7 @@ class WarpTest(ContainerizedTest):
                 for chunk in bits:
                     fd.write(chunk)
         except docker.errors.NotFound as e:
-            logging.error("warp.json not found. no results. failing")
+            LOG.error("warp.json not found. no results. failing")
             raise e
 
         with tarfile.open(results_tarball) as tf:
@@ -424,8 +424,8 @@ class WarpTest(ContainerizedTest):
         try:
             self.json_results = json.loads(data)
         except json.decoder.JSONDecodeError:
-            logging.error("warp result parsing failed.", exc_info=True)
-            logging.error("data:\n %s", data, exc_info=True)
+            LOG.error("warp result parsing failed.", exc_info=True)
+            LOG.error("data:\n %s", data, exc_info=True)
             self.json_results = {}
 
         return result["StatusCode"]
@@ -498,8 +498,8 @@ class TestRunner:
 
     def run_suite(self, suite):
         self.suite_id = results_db.make_id()
-        logging.info(f"▶️ STARTING TEST SUITE {suite.name} ID {self.suite_id}")
-        logging.info(f"♻️ {self.reps} REPS / TEST")
+        LOG.info(f"▶️ STARTING TEST SUITE {suite.name} ID {self.suite_id}")
+        LOG.info(f"♻️ {self.reps} REPS / TEST")
         self.db.save_before_suite(self.suite_id, suite.name, suite.description)
         self.db.save_test_environment_default(self.suite_id)
         self.db.save_test_environment(self.suite_id, self.storage.env())
@@ -513,14 +513,14 @@ class TestRunner:
         self.test_id = results_db.make_id()
 
         self.db.save_before_test(self.suite_id, self.test_id, str(test), test.kind())
-        logging.info(f"🔎 TEST {test} ID {self.test_id}")
+        LOG.info(f"🔎 TEST {test} ID {self.test_id}")
 
         for rep in range(self.reps):
-            logging.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
+            LOG.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
             try:
                 self.run_test_rep(test)
             except Exception:
-                logging.exception(
+                LOG.exception(
                     "😥 TEST %s REP %s/%s FAILED. Continuing with next test in suite",
                     test,
                     rep,
@@ -537,7 +537,7 @@ class TestRunner:
         self.db.save_before_rep(self.test_id, self.rep_id)
         self.storage.reset()
 
-        logging.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
+        LOG.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
         self.under_test_container.run(name=f"under_test_{self.rep_id}")
         self.save_under_test_container_env_once()
 
@@ -548,7 +548,7 @@ class TestRunner:
         try:
             returncode = test.run(self)
         except Exception as e:
-            logging.exception(
+            LOG.exception(
                 "😥 TEST %s REP ID %s failed with exception: %s",
                 test.name,
                 self.rep_id,
@@ -560,7 +560,7 @@ class TestRunner:
             raise e
 
         if returncode != 0:
-            logging.error(
+            LOG.error(
                 "😥 TEST %s REP ID %s finished with returncode != 0: %s",
                 test.name,
                 self.rep_id,
@@ -574,7 +574,7 @@ class TestRunner:
         try:
             results = test.results(self)
         except Exception as e:
-            logging.exception(
+            LOG.exception(
                 "😥 TEST %s REP ID %s" " result parsing failed with exception: %s",
                 test.name,
                 self.rep_id,
@@ -689,7 +689,10 @@ def cli(ctx, debug):
     ctx.ensure_object(dict)
     loglevel = [logging.WARNING, logging.DEBUG][int(debug)]
     logging.basicConfig(
-        level=loglevel, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=loglevel,
+        format="%(message)s",
+        datefmt="[%Y-%m-%d %H:%M:%S]",
+        handlers=[RichHandler(rich_tracebacks=True)],
     )
     ctx.obj["DEBUG"] = debug
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARN)
@@ -1222,7 +1225,7 @@ def compare(ctx, suite_a, suite_b):
                 else:
                     value = "-"
             except Exception:
-                logging.exception("💣 %s %s", a, b)
+                LOG.exception("💣 %s %s", a, b)
                 value = "ERR"
             out_row[cols[(a[0], a[2])]] = value
         table.add_row(*out_row)
