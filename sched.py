@@ -73,13 +73,14 @@ class Job:
             command = [SCRIPT_PATH / "vogon2.py", "--debug", "test"]
 
         LOG.info(f"running {self} command {command} with env {env}")
-
+        LOG.info(">" * 42)
         try:
             proc = subprocess.run(command, env=env, check=True)
             proc.wait()
         except subprocess.CalledProcessError as e:
             LOG.error(f"vogon call failed with {e.returncode}")
             raise e
+        LOG.info("<" * 42)
 
 
 def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
