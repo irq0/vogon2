@@ -499,7 +499,7 @@ class TestRunner:
     def run_suite(self, suite):
         self.suite_id = results_db.make_id()
         LOG.info(f"▶️ STARTING TEST SUITE {suite.name} ID {self.suite_id}")
-        LOG.info(f"♻️ {self.reps} REPS / TEST")
+        LOG.info(f"♻️  {self.reps} REPS / TEST")
         self.db.save_before_suite(self.suite_id, suite.name, suite.description)
         self.db.save_test_environment_default(self.suite_id)
         self.db.save_test_environment(self.suite_id, self.storage.env())
