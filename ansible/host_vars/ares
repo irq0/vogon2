@@ -12,5 +12,5 @@ vogon_sched:
     VOGON_MKFS: "/sbin/mkfs.ext4"
     VOGON_DOCKER_API: "unix://run/docker.sock"
     VOGON_SQLITE: "/home/vogon/vogon.sqlite3"
-    VOGON_ARCHIVE: "/home/vogon/testrun_archive"
+    VOGON_ARCHIVE_DIR: "/home/vogon/testrun_archive"
     VOGON_RESET_STORAGE: "true"
