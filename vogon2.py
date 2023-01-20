@@ -1136,7 +1136,7 @@ def result(ctx, rep_id, key):
                 pass
             if len(v) > 42:
                 v = f"[italic]Skipping {len(v)} byte value[/italic]"
-            table.add_row(k, u, v)
+            table.add_row(k, u, format_value(v, u))
 
         console = Console()
         console.print(table)
