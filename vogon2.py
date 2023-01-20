@@ -1081,6 +1081,25 @@ def results(ctx, suite_id):
     cur.close()
 
 
+@report.command()
+@click.option("--rep-id", type=str, required=True)
+@click.option("--key", type=str, required=True)
+@click.pass_context
+def result(ctx, rep_id, key):
+    "Get single result value"
+    cur = ctx.obj["db"].cursor()
+    print(
+        cur.execute(
+            """
+    SELECT value
+    FROM results
+    WHERE rep_id = ? and key = ?
+    """,
+            (rep_id, key),
+        ).fetchone()[0]
+    )
+
+
 class IncompatibleSuites(Exception):
     pass
 
