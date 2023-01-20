@@ -14,4 +14,4 @@
     state: directory
     owner: vogon
     group: vogon
-    mode: '0775'
+    mode: '0755'
