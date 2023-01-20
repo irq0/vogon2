@@ -299,7 +299,6 @@ class FIOTest(HostTest):
             logging.exception("fio crashed :()", exc_info=True)
             return -1
 
-        self.json = out
         self.data = json.loads(out)
 
         return 0
@@ -310,7 +309,7 @@ class FIOTest(HostTest):
     def results(self, instance: "TestRunner"):
         j = self.data["jobs"][0]
         return [
-            ("JSON", self.json, "JSON"),
+            ("JSON", json.dumps(self.data), "JSON"),
             ("read-iops", j["read"]["iops"], "iops"),
             ("read-bw", j["read"]["bw_bytes"], "byte/s"),
             ("write-iops", j["read"]["iops"], "iops"),
