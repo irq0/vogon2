@@ -1,2 +1,3 @@
+vogon_virtualenv: "/tmp/vogon2-py-venv"
 vogon_sched:
   environment:

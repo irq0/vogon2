@@ -60,14 +60,22 @@ class Job:
     def __str__(self):
         return f"Job(name={self.name}, file={self.path})"
 
-    def run(self, environment):
-        env = environment | self.environment
+    def run(self, config):
+        env = config["environment"] | self.environment
+        if "virtualenv" in config:
+            command = [
+                pathlib.Path(config["virtualenv"]) / "bin" / "python",
+                SCRIPT_PATH / "vogon2.py",
+                "--debug",
+                "test",
+            ]
+        else:
+            command = [SCRIPT_PATH / "vogon2.py", "--debug", "test"]
+
         LOG.info(f"running {self} with env {env}")
 
         try:
-            proc = subprocess.run(
-                [SCRIPT_PATH / "vogon2.py", "--debug", "test"], env=env, check=True
-            )
+            proc = subprocess.run(command, env=env, check=True)
             proc.wait()
         except subprocess.CalledProcessError as e:
             LOG.error(f"vogon call failed with {e.returncode}")
@@ -148,6 +156,7 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
         try:
             with open(config_file) as fd:
                 config = json.load(fd)
+
                 LOG.debug("read config {config_file}: {config}")
         except json.decoder.JSONDecodeError:
             LOG.error(f"JSON error in config file {config_file}. retrying load in 10s")
@@ -156,7 +165,7 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
 
         job.move(running)
         try:
-            job.run(config["environment"])
+            job.run(config)
         except KeyboardInterrupt:
             LOG.info(f"moving interrupted job {job} to failed")
             job.move(failed)

@@ -8,7 +8,7 @@
 - name: virtualenv
   ansible.builtin.pip:
     requirements: /home/vogon/vogon2/requirements.txt
-    virtualenv: /home/vogon/vogon2-py-venv
+    virtualenv: '{{ vogon_virtualenv }}'
     virtualenv_command: /usr/bin/python3.10 -m venv
 
 - name: scheduler config
