@@ -50,6 +50,9 @@ class ResultsDB:
         """
         cur = self.db.cursor()
         for key, value, unit in results:
+            if isinstance(value, bytes):
+                value = value.decode("utf-8")
+
             cur.execute(
                 """insert into results (rep_id, key, value, unit)
                                        values (?, ?, ?, ?);""",
