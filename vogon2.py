@@ -312,7 +312,7 @@ class FIOTest(HostTest):
         return {"fio-version": self.data["fio version"]}
 
     def results(self, instance: "TestRunner"):
-        results = [
+        result = [
             ("JSON", json.dumps(self.data), "JSON"),
         ]
 
@@ -320,7 +320,7 @@ class FIOTest(HostTest):
         j = self.data["jobs"][0]
         for op in ("read", "write"):
             for agg in ("min", "max", "mean"):
-                results.extend(
+                result.extend(
                     [
                         (f"{op}-{agg}-iops", str(j[op][f"iops_{agg}"]), "iops"),
                         (f"{op}-{agg}-bw", str(j[op][f"bw_{agg}"] * 1024), "byte/s"),
