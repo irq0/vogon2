@@ -16,7 +16,7 @@ SLEEP_TIME_SEC = 2
 
 
 class Job:
-    required_keys = ("name", "under_test_image", "suite")
+    required_keys = ("under_test_image", "suite")
     env_keys = ("under_test_image", "under_test_image_pull", "suite")
 
     @staticmethod
@@ -46,7 +46,7 @@ class Job:
                 f"keys={job.keys()} required={self.required_keys}"
             )
 
-        self.name = job["name"]
+        self.name = job_file.stem
         self.environment = {
             f"VOGON_{env_key.upper()}": value
             for env_key, value in job.items()
