@@ -1095,26 +1095,52 @@ def results(ctx, suite_id):
 
 @report.command()
 @click.option("--rep-id", type=str, required=True)
-@click.option("--key", type=str, required=True)
+@click.option("--key", type=str)
 @click.pass_context
 def result(ctx, rep_id, key):
     "Get single result value"
     cur = ctx.obj["db"].cursor()
-    data = cur.execute(
-        """
-        SELECT value
-        FROM results
-        WHERE rep_id = ? and key = ?
-        """,
-        (rep_id, key),
-    ).fetchone()
-    try:
-        out = data[0].decode("utf-8")
-    except (UnicodeDecodeError, AttributeError):
-        out = data[0]
+    if key:
+        data = cur.execute(
+            """
+            SELECT value
+            FROM results
+            WHERE rep_id = ? and key = ?
+            """,
+            (rep_id, key),
+        ).fetchone()
+        try:
+            out = data[0].decode("utf-8")
+        except (UnicodeDecodeError, AttributeError):
+            out = data[0]
 
-    console = Console()
-    console.print(out)
+        console = Console()
+        console.print(out)
+    else:
+        table = Table(show_header=True, box=rich.box.SIMPLE)
+        table.add_column("Key", style="green")
+        table.add_column("Unit")
+        table.add_column("Value")
+        rows = cur.execute(
+            """
+            SELECT key, value, unit
+            FROM results
+            WHERE rep_id = ?
+            """,
+            (rep_id,),
+        ).fetchall()
+        for k, v, u in rows:
+            try:
+                v = v.decode("utf-8")
+            except (UnicodeDecodeError, AttributeError):
+                pass
+            if len(v) > 42:
+                v = f"[italic]Skipping {len(v)} byte value[/italic]"
+            table.add_row(k, u, v)
+
+        console = Console()
+        console.print(table)
+    cur.close()
 
 
 class IncompatibleSuites(Exception):
