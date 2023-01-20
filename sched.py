@@ -64,7 +64,7 @@ class Job:
         env = config["environment"] | self.environment
         if "virtualenv" in config.keys():
             command = [
-                pathlib.Path(config["virtualenv"]) / "bin" / "python",
+                pathlib.Path(config["virtualenv"]) / "bin" / "python3",
                 SCRIPT_PATH / "vogon2.py",
                 "--debug",
                 "test",
