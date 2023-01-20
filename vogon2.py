@@ -949,6 +949,30 @@ def show(ctx, suite_id):
         table.add_row(str(k), str(v))
 
     console.print(table)
+
+    table = Table(box=rich.box.SIMPLE)
+    table.add_column("Test Name", style="red")
+    table.add_column("Test ID")
+    table.add_column("Repetition IDs")
+
+    tests = cur.execute(
+        """
+        SELECT
+        tests.test_id,
+        tests.name,
+        group_concat(test_repetitions.rep_id) as reps
+        FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
+          JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
+        WHERE suites.suite_id = ?
+        GROUP BY tests.test_id
+        ORDER BY tests.name
+        """,
+        (suite_id,),
+    ).fetchall()
+    for test_id, name, rep_ids in tests:
+        table.add_row(name, test_id, rep_ids)
+
+    console.print(table)
     cur.close()
 
 
