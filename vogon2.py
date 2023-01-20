@@ -702,17 +702,21 @@ def cli(ctx, debug):
 @click.option(
     "--under-test-image",
     type=str,
+    envvar="VOGON_UNDER_TEST_IMAGE",
     required=True,
     help="Docker image of the application under test",
 )
 @click.option(
     "--under-test-image-pull/--no-under-test-image-pull",
-    default=False,
+    envvar="VOGON_UNDER_TEST_IMAGE_PULL",
+    default=True,
+    show_default=True,
     help="Pull under test image?",
 )
 @click.option(
     "--suite",
     type=click.Choice(list(test_suites_indexed.keys())),
+    envvar="VOGON_SUITE",
     required=True,
     help="Test suite. See vogon2.py for configuration",
 )
@@ -727,6 +731,7 @@ def cli(ctx, debug):
         allow_dash=False,
         path_type=pathlib.Path,
     ),
+    envvar="VOGON_ARCHIVE_DIR",
     required=True,
     help="Directory to archive test artifacts to",
 )
@@ -741,6 +746,7 @@ def cli(ctx, debug):
         allow_dash=False,
         path_type=pathlib.Path,
     ),
+    envvar="VOGON_STORAGE_DEVICE",
     required=True,
     help="Storage device to extract information from (e.g /dev/disk/by-id/...)",
 )
@@ -755,6 +761,7 @@ def cli(ctx, debug):
         allow_dash=False,
         path_type=pathlib.Path,
     ),
+    envvar="VOGON_STORAGE_PARTITION",
     required=True,
     help="Storage device to run on (e.g /dev/disk/by-id/...)",
 )
@@ -769,28 +776,38 @@ def cli(ctx, debug):
         allow_dash=False,
         path_type=pathlib.Path,
     ),
+    envvar="VOGON_MOUNTPOINT",
     required=True,
     help="Mountpoint for --storage-device",
 )
 @click.option(
     "--mkfs",
     type=str,
+    envvar="VOGON_MKFS",
     required=True,
     help="mkfs command. splitted by .split(). append device on call",
 )
 @click.option(
     "--docker-api",
     type=str,
+    envvar="VOGON_DOCKER_API",
     required=True,
     help="Docker API URI. e.g unix://run/podman/podman.sock",
 )
 @click.option(
-    "--sqlite", type=str, required=True, help="Where to find the sqlite database?"
+    "--sqlite",
+    type=str,
+    envvar="VOGON_SQLITE",
+    show_default=True,
+    required=True,
+    help="Where to find the sqlite database?",
 )
 @click.option("--init-db/--no-init-db", default=False, help="Create tables, etc")
 @click.option(
     "--reset-storage/--no-reset-storage",
+    envvar="VOGON_RESET_STORAGE",
     default=False,
+    show_default=True,
     help="Reset storage (umount,mkfs,mount) between reps",
 )
 @click.option("--repeat", type=int, default=1, help="How many repetitions to run")
