@@ -291,7 +291,12 @@ class FIOTest(HostTest):
                 instance.storage.mountpoint,
             )
             out = subprocess.check_output(
-                ["fio", "--output-format=json", str(self.job_file.absolute())],
+                [
+                    "fio",
+                    "--group_reporting",
+                    "--output-format=json",
+                    str(self.job_file.absolute()),
+                ],
                 stderr=subprocess.STDOUT,
                 cwd=instance.storage.mountpoint,
             )
@@ -307,14 +312,22 @@ class FIOTest(HostTest):
         return {"fio-version": self.data["fio version"]}
 
     def results(self, instance: "TestRunner"):
-        j = self.data["jobs"][0]
-        return [
+        results = [
             ("JSON", json.dumps(self.data), "JSON"),
-            ("read-iops", j["read"]["iops"], "iops"),
-            ("read-bw", j["read"]["bw_bytes"], "byte/s"),
-            ("write-iops", j["read"]["iops"], "iops"),
-            ("write-bw", j["read"]["bw_bytes"], "byte/s"),
         ]
+
+        # 'group reporting' enabled -> one job entry with aggregated results
+        j = self.data["jobs"][0]
+        for op in ("read", "write"):
+            for agg in ("min", "max", "mean"):
+                results.extend(
+                    [
+                        (f"{op}-{agg}-iops", str(j[op][f"iops_{agg}"]), "iops"),
+                        (f"{op}-{agg}-bw", str(j[op][f"bw_{agg}"] * 1024), "byte/s"),
+                    ]
+                )
+
+        return result
 
     def kind(self) -> str:
         return "FIO"
