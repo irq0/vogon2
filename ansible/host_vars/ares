@@ -1,2 +1,13 @@
 vogon_disks:
   - /dev/disk/by-id/nvme-INTEL_SSDPED1K375GA_PHKS745500H5375AGN
+
+vogon_sched:
+  environment:
+    VOGON_STORAGE_DEVICE: "/dev/disk/by-id/nvme-INTEL_SSDPED1K375GA_PHKS745500H5375AGN"
+    VOGON_STORAGE_PARTITION: "/dev/disk/by-id/nvme-INTEL_SSDPED1K375GA_PHKS745500H5375AGN-part1"
+    VOGON_MOUNTPOINT: "/home/vogon/mnt/"
+    VOGON_MKFS: "/sbin/mkfs.ext4"
+    VOGON_DOCKER_API: "unix://run/docker.sock"
+    VOGON_SQLITE: "/home/vogon/vogon.sqlite3"
+    VOGON_ARCHIVE: "/home/vogon/testrun_archive"
+    VOGON_RESET_STORAGE: "true"

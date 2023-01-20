@@ -11,6 +11,34 @@
     virtualenv: /home/vogon/vogon2-py-venv
     virtualenv_command: /usr/bin/python3.10 -m venv
 
+- name: scheduler config
+  ansible.builtin.template:
+    src: sched.json.j2
+    dest: /home/vogon/sched.json
+  vars:
+    json: '{{ vogon_sched | to_nice_json }}'
+
+- name: scheduler directory
+  ansible.builtin.file:
+    path: /home/vogon/sched
+    state: directory
+    owner: vogon
+    group: vogon
+    mode: '0755'
+
+- name: scheduler subdirs
+  ansible.builtin.file:
+    path: '/home/vogon/sched/{{ item }}'
+    state: directory
+    owner: vogon
+    group: vogon
+    mode: '0755'
+  loop:
+    - todo
+    - failed
+    - done
+    - running
+
 - name: testrun
   ansible.builtin.shell: |
     source /home/vogon/vogon2-py-venv/bin/activate
