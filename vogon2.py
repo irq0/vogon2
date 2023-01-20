@@ -322,8 +322,8 @@ class FIOTest(HostTest):
             for agg in ("min", "max", "mean"):
                 result.extend(
                     [
-                        (f"{op}-{agg}-iops", str(j[op][f"iops_{agg}"]), "iops"),
-                        (f"{op}-{agg}-bw", str(j[op][f"bw_{agg}"] * 1024), "byte/s"),
+                        (f"{op}-iops-{agg}", str(j[op][f"iops_{agg}"]), "iops"),
+                        (f"{op}-bw-{agg}", str(j[op][f"bw_{agg}"] * 1024), "byte/s"),
                     ]
                 )
 
