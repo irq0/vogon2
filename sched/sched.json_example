@@ -1,0 +1,12 @@
+{
+  "environment": {
+      "VOGON_DOCKER_API": "unix:/run/podman/podman.sock",
+      "VOGON_MKFS": "/bin/true",
+      "VOGON_MOUNTPOINT": "/compile/tmp/mnt",
+      "VOGON_SQLITE": "/compile/tmp/vogon2.sqlite3",
+      "VOGON_STORAGE_DEVICE": "/dev/disk/by-id/ata-HL-DT-ST_DVDRAM_GH24NSC0_K85F4RG1218",
+      "VOGON_STORAGE_PARTITION": "/dev/disk/by-id/ata-HL-DT-ST_DVDRAM_GH24NSC0_K85F4RG1218",
+      "VOGON_ARCHIVE_DIR": "/tmp",
+      "VOGON_RESET_STORAGE": "false"
+  }
+}

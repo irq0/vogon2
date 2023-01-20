@@ -1,0 +1,6 @@
+{
+    "name": "demo",
+    "under_test_image": "quay.io/s3gw/s3gw:v0.10.0",
+    "under_test_image_pull": "true",
+    "suite": "demo"
+}
