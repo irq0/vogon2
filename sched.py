@@ -48,7 +48,7 @@ class Job:
 
         self.name = job_file.stem
         self.environment = {
-            f"VOGON_{env_key.upper()}": value
+            f"VOGON_{env_key.upper()}": str(value)
             for env_key, value in job.items()
             if env_key in self.env_keys
         }
