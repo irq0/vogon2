@@ -17,7 +17,7 @@ SLEEP_TIME_SEC = 2
 
 class Job:
     required_keys = ("under_test_image", "suite")
-    env_keys = ("under_test_image", "under_test_image_pull", "suite")
+    env_keys = ("under_test_image", "under_test_image_pull", "suite", "repetitions")
 
     @staticmethod
     def parse(job_path: pathlib.Path, rejected_dir: pathlib.Path):
