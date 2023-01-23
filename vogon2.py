@@ -813,7 +813,13 @@ def cli(ctx, debug):
     show_default=True,
     help="Reset storage (umount,mkfs,mount) between reps",
 )
-@click.option("--repeat", type=int, default=1, help="How many repetitions to run")
+@click.option(
+    "--repeat",
+    type=int,
+    envvar="VOGON_REPETITIONS",
+    default=1,
+    help="How many repetitions to run",
+)
 def test(
     ctx,
     under_test_image,
