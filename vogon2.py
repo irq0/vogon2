@@ -155,11 +155,11 @@ class Storage:
 
     def reset(self):
         if not self.enable_reset_mkfs_mount:
-            LOG.info("🛢 storage reset disabled. skipping umount, mkfs, mount")
+            LOG.info("💾 storage reset disabled. skipping umount, mkfs, mount")
             return
         try:
             LOG.info(
-                f"🛢 resetting storage: mountpoint {self.mountpoint}, "
+                f"💾 resetting storage: mountpoint {self.mountpoint}, "
                 f"dev {self.partition}, command {self.mkfs_command}"
             )
             try:
@@ -206,6 +206,7 @@ class Storage:
     def drop_caches(self):
         "Drop caches. Classic echo 3 > /proc/sys/vm/drop_caches"
         # raises exception if fails
+        LOG.info("💾 dropping caches")
         try:
             subprocess.check_call(
                 ["sudo", "bash", "-c", "echo 3 > /proc/sys/vm/drop_caches"]
