@@ -156,7 +156,7 @@ def testruns(ctx):
 
 @report.command()
 @click.pass_context
-@click.option("--suite-id", type=str, required=True)
+@click.argument("suite-id", type=str)
 def environ(ctx, suite_id):
     "Test enviromnent data"
     select_print_table(
@@ -174,7 +174,7 @@ def environ(ctx, suite_id):
 
 
 @report.command()
-@click.option("--suite-id", type=str, required=True)
+@click.argument("suite-id", type=str)
 @click.pass_context
 def show(ctx, suite_id):
     "Testrun details"
@@ -262,7 +262,7 @@ def show(ctx, suite_id):
 
 
 @report.command()
-@click.option("--suite-id", type=str, required=True)
+@click.argument("suite-id", type=str)
 @click.pass_context
 def results(ctx, suite_id):
     "Results table"
@@ -345,8 +345,8 @@ def result(ctx, rep_id, key):
 
 
 @report.command()
-@click.option("--suite-a", type=str, required=True)
-@click.option("--suite-b", type=str, required=True)
+@click.argument("suite-a", type=str)
+@click.argument("suite-b", type=str)
 @click.pass_context
 def compare(ctx, suite_a, suite_b):
     "Results comparison table"
