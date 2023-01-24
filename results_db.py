@@ -3,6 +3,7 @@ import platform
 import sqlite3
 import typing
 import uuid
+from contextlib import closing
 
 import cpuinfo
 
@@ -194,6 +195,58 @@ class ResultsDB:
         )
         self.db.commit()
         cur.close()
+
+    def get_tests(self, suite_id: IDType):
+        with closing(self.db.cursor()) as cur:
+            return cur.execute(
+                """
+        SELECT tests.test_id, tests.name, count(test_repetitions.rep_id) as reps,
+          tests.kind
+        FROM tests
+          JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
+        WHERE tests.suite_id = ?
+        GROUP BY test_repetitions.rep_id
+        ORDER BY tests.name
+        """,
+                (suite_id,),
+            ).fetchall()
+
+    def get_test_results(self, test_id: IDType, reps: int):
+        if reps == 1:
+            with closing(self.db.cursor()) as cur:
+                return cur.execute(
+                    """
+                SELECT results.key, results.value, results.unit
+                FROM test_repetitions JOIN results
+                  ON (test_repetitions.rep_id = results.rep_id)
+                WHERE test_repetitions.test_id = ?
+                  AND results.unit != "JSON"
+                """,
+                    (test_id,),
+                ).fetchall()
+        else:
+            raise NotImplementedError(
+                "Sorry printing multiple repetition runs not yet supported"
+            )
+
+    def get_all_test_results(self, tests: list[tuple[str, str, int, str]]):
+        "return: test_name X ((key,value,unit), ..)"
+        return [
+            (test_name, self.get_test_results(test_id, reps))
+            for test_id, test_name, reps, _ in tests
+        ]
+
+    @staticmethod
+    def get_test_col_set(results):
+        cols = ["Test"] + sorted(
+            {(row[0], row[2]) for _, rows in results for row in rows}
+        )  # -> ("Test", row name[0], ...
+
+        cols_pos_lookup = {
+            col: i for i, col in enumerate(cols)
+        }  # -> {row name: position in table}
+
+        return cols_pos_lookup
 
 
 def init_db(dbconn):

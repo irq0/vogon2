@@ -10,24 +10,32 @@ from rich import print as pprint
 from rich.console import Console
 from rich.table import Table
 
+import results_db
+
 SCRIPT_PATH = pathlib.Path(__file__).parent
 LOG = logging.getLogger("vogon-report")
 
 
-@click.group()
-@click.pass_context
-@click.option(
-    "--sqlite", type=str, required=True, help="Where to find the sqlite database?"
-)
-def report(ctx, sqlite):
-    dbconn = sqlite3.connect(sqlite)
-    cur = dbconn.cursor()
-    cur.execute("PRAGMA foreign_keys = ON;")
-    cur.close()
-    ctx.obj["db"] = dbconn
+def format_bytes(b):
+    if b < 1024:
+        return f"{b:1.2f}"
+
+    for i, suffix in enumerate(("K", "M", "G"), 2):
+        unit = 1024**i
+        if b < unit:
+            break
+    return f"{(1024 * b / unit):1.2f}{suffix}"
+
+
+def format_value(value, unit):
+    if unit == "byte/s":
+        return format_bytes(float(value))
+    else:
+        return value
 
 
 def select_print_table(db, sql, params=()):
+    "Query db with sql. Print results as formatted table to console"
     console = Console()
     table = Table(show_header=True, box=rich.box.SIMPLE)
 
@@ -42,12 +50,95 @@ def select_print_table(db, sql, params=()):
     console.print(table)
 
 
+class IncompatibleSuites(Exception):
+    pass
+
+
+def make_comparison_table(
+    db: results_db.ResultsDB,
+    suite_a: results_db.IDType,
+    suite_b: results_db.IDType,
+    headline_fn,
+    add_row_fn,
+):
+    """
+    Create table comparing test results for suite_a and suite_b
+
+    Output through callback functions:
+    headline_fn([(headline, subtitle/tooltip), ..]), called once
+    add_row_fn([(title, subtitle/tooltip), ..]), called for each row
+    """
+
+    AB = collections.namedtuple("AB", ["a", "b"])
+    tests = AB(db.get_tests(suite_a), db.get_tests(suite_b))
+    results = AB(db.get_all_test_results(tests.a), db.get_all_test_results(tests.b))
+    cols = AB(db.get_test_col_set(results.a), db.get_test_col_set(results.b))
+
+    if {test[1] for test in tests.a} != {test[1] for test in tests.b}:
+        pprint(tests)
+        raise IncompatibleSuites("Different set of tests")
+    if cols.a != cols.b:
+        pprint(cols)
+        raise IncompatibleSuites("Different set of result columns")
+
+    cols = cols.a
+    headlines = []
+    for col in cols.a.keys():
+        if isinstance(col, tuple):
+            headlines.append(col)
+        else:
+            headlines.append((str(col), ""))
+    headline_fn(headlines)
+
+    for (test_a, rows_a), (test_b, rows_b) in zip(results.a, results.b):
+        if test_a != test_b:
+            pprint(test_a, test_b)
+            raise IncompatibleSuites
+        test = test_a
+        out_row = [(test, "")] + [""] * (len(cols) - 1)
+
+        for a, b in zip(rows_a, rows_b):
+            if a[0] != b[0]:
+                pprint(a, b)
+                raise IncompatibleSuites
+
+            try:
+                va, vb = float(a[1]), float(b[1])
+                unit = a[2]
+                if va > 0:
+                    value = (
+                        f"{vb/va:1.2f}x",
+                        f"{format_value(va, unit)}￫{format_value(vb, unit)}",
+                    )
+                else:
+                    value = ("-", "")
+            except Exception:
+                LOG.exception("💣 %s %s", a, b)
+                value = ("ERR", "")
+            out_row[cols.a[(a[0], a[2])]] = value
+        add_row_fn(out_row)
+
+
+@click.group()
+@click.pass_context
+@click.option(
+    "--sqlite", type=str, required=True, help="Where to find the sqlite database?"
+)
+def report(ctx, sqlite):
+    "Query test database"
+    dbconn = sqlite3.connect(sqlite)
+    cur = dbconn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+    cur.close()
+    ctx.obj["db"] = results_db.ResultsDB(dbconn)
+
+
 @report.command()
 @click.pass_context
 def testruns(ctx):
     "List testruns"
     select_print_table(
-        ctx.obj["db"],
+        ctx.obj["db"].db,
         """
     SELECT
       suites.suite_id,
@@ -70,7 +161,7 @@ def testruns(ctx):
 def environ(ctx, suite_id):
     "Test enviromnent data"
     select_print_table(
-        ctx.obj["db"],
+        ctx.obj["db"].db,
         """
         SELECT
           environment.key,
@@ -88,7 +179,7 @@ def environ(ctx, suite_id):
 @click.pass_context
 def show(ctx, suite_id):
     "Testrun details"
-    cur = ctx.obj["db"].cursor()
+    cur = ctx.obj["db"].db.cursor()
 
     console = Console()
     table = Table(show_header=False, box=rich.box.SIMPLE)
@@ -171,86 +262,15 @@ def show(ctx, suite_id):
     cur.close()
 
 
-def get_tests(cur, suite_id):
-    return cur.execute(
-        """
-    SELECT tests.test_id, tests.name, count(test_repetitions.rep_id) as reps, tests.kind
-    FROM tests
-      JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
-    WHERE tests.suite_id = ?
-    GROUP BY test_repetitions.rep_id
-    ORDER BY tests.name
-    """,
-        (suite_id,),
-    ).fetchall()
-
-
-def get_test_results(cur, test_id, reps):
-    if reps == 1:
-        rep_results = cur.execute(
-            """
-            SELECT results.key, results.value, results.unit
-            FROM test_repetitions JOIN results
-              ON (test_repetitions.rep_id = results.rep_id)
-            WHERE test_repetitions.test_id = ?
-              AND results.unit != "JSON"
-            """,
-            (test_id,),
-        )
-        return rep_results.fetchall()
-    else:
-        raise NotImplementedError(
-            "Sorry printing multiple repetition runs not yet supported"
-        )
-
-
-def get_all_test_results(cur, tests):
-    "return: test_name X ((key,value,unit), ..)"
-    return [
-        (test_name, get_test_results(cur, test_id, reps))
-        for test_id, test_name, reps, _ in tests
-    ]
-
-
-def get_test_col_set(cur, results):
-    cols = ["Test"] + sorted(
-        {(row[0], row[2]) for _, rows in results for row in rows}
-    )  # -> ("Test", row name[0], ...
-
-    cols_pos_lookup = {
-        col: i for i, col in enumerate(cols)
-    }  # -> {row name: position in table}
-
-    return cols_pos_lookup
-
-
-def format_bytes(b):
-    if b < 1024:
-        return f"{b:1.2f}"
-
-    for i, suffix in enumerate(("K", "M", "G"), 2):
-        unit = 1024**i
-        if b < unit:
-            break
-    return f"{(1024 * b / unit):1.2f}{suffix}"
-
-
-def format_value(value, unit):
-    if unit == "byte/s":
-        return format_bytes(float(value))
-    else:
-        return value
-
-
 @report.command()
 @click.option("--suite-id", type=str, required=True)
 @click.pass_context
 def results(ctx, suite_id):
     "Results table"
-    cur = ctx.obj["db"].cursor()
-    tests = get_tests(cur, suite_id)
-    results = get_all_test_results(cur, tests)
-    cols = get_test_col_set(cur, results)
+    db = ctx.obj["db"]
+    tests = db.get_tests(suite_id)
+    results = db.get_all_test_results(tests)
+    cols = db.get_test_col_set(results)
 
     console = Console()
     table = Table(
@@ -273,7 +293,6 @@ def results(ctx, suite_id):
         table.add_row(*out_row)
 
     console.print(table)
-    cur.close()
 
 
 @report.command()
@@ -282,7 +301,7 @@ def results(ctx, suite_id):
 @click.pass_context
 def result(ctx, rep_id, key):
     "Get single result value"
-    cur = ctx.obj["db"].cursor()
+    cur = ctx.obj["db"].db.cursor()
     if key:
         data = cur.execute(
             """
@@ -326,69 +345,13 @@ def result(ctx, rep_id, key):
     cur.close()
 
 
-class IncompatibleSuites(Exception):
-    pass
-
-
-def make_comparison_table(cur, suite_a, suite_b, headline_fn, add_row_fn):
-    "Results comparison table"
-    AB = collections.namedtuple("Tests", ["a", "b"])
-    tests = AB(get_tests(cur, suite_a), get_tests(cur, suite_b))
-    results = AB(get_all_test_results(cur, tests.a), get_all_test_results(cur, tests.b))
-    cols = AB(get_test_col_set(cur, results.a), get_test_col_set(cur, results.b))
-
-    if {test[1] for test in tests.a} != {test[1] for test in tests.b}:
-        pprint(tests)
-        raise IncompatibleSuites("Different set of tests")
-    if cols.a != cols.b:
-        pprint(cols)
-        raise IncompatibleSuites("Different set of result columns")
-
-    cols = cols.a
-    headlines = []
-    for col in cols.keys():
-        if isinstance(col, tuple):
-            headlines.append(rf"[bold]{col[0]}[/bold] \[{col[1]}]")
-        else:
-            headlines.append(str(col))
-    headline_fn(headlines)
-
-    for (test_a, rows_a), (test_b, rows_b) in zip(results.a, results.b):
-        if test_a != test_b:
-            pprint(test_a, test_b)
-            raise IncompatibleSuites
-        test = test_a
-        out_row = [(test, "")] + [""] * (len(cols) - 1)
-
-        for a, b in zip(rows_a, rows_b):
-            if a[0] != b[0]:
-                pprint(a, b)
-                raise IncompatibleSuites
-
-            try:
-                va, vb = float(a[1]), float(b[1])
-                unit = a[2]
-                if va > 0:
-                    value = (
-                        f"{vb/va:1.2f}x",
-                        f"{format_value(va, unit)}￫{format_value(vb, unit)}",
-                    )
-                else:
-                    value = ("-", "")
-            except Exception:
-                LOG.exception("💣 %s %s", a, b)
-                value = ("ERR", "")
-            out_row[cols[(a[0], a[2])]] = value
-        add_row_fn(out_row)
-
-
 @report.command()
 @click.option("--suite-a", type=str, required=True)
 @click.option("--suite-b", type=str, required=True)
 @click.pass_context
 def compare(ctx, suite_a, suite_b):
     "Results comparison table"
-    cur = ctx.obj["db"].cursor()
+    db = ctx.obj["db"]
     console = Console()
     table = Table(
         show_header=True,
@@ -399,15 +362,20 @@ def compare(ctx, suite_a, suite_b):
 
     def add_headline(headlines):
         for hd in headlines:
-            if isinstance(hd, tuple):
-                headline = rf"[bold]{hd[0]}[/bold] \[{hd[1]}]"
+            if hd[1]:
+                headline = f"[bold]{hd[0]}[/bold]\n\\[{hd[1]}]"
             else:
-                headline = str(hd)
+                headline = hd[0]
             table.add_column(headline, justify="right")
 
     def add_row(row):
-        table.add_row(*row)
+        out = []
+        for cell in row:
+            if cell[1]:
+                out.append(f"[bold]{cell[0]}[/bold]\n{cell[1]}")
+            else:
+                out.append(cell[0])
+        table.add_row(*out)
 
-    make_comparison_table(cur, suite_a, suite_b, add_headline, add_row)
+    make_comparison_table(db, suite_a, suite_b, add_headline, add_row)
     console.print(table)
-    cur.close()
