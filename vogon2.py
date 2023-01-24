@@ -344,6 +344,11 @@ class WarpTest(ContainerizedTest):
         "--benchdata=/warp.out",
     ]
 
+    s3_op_to_fio_op = {
+        "GET": "read",
+        "PUT": "write",
+    }
+
     def __init__(self, name: str, workload: str, args: list[str] = []):
         super().__init__(name, self.default_container_image)
         self.workload = workload
@@ -434,15 +439,20 @@ class WarpTest(ContainerizedTest):
 
         results.append(("JSON", self.raw_results, "JSON"))
 
+        # normalize keys to FIOTest
         for op in self.json_results.get("operations", []):
-            prefix = op["type"] + "_"
+            if op["skipped"]:
+                continue
+            try:
+                type_fio = self.s3_op_to_fio_op[op["type"]]
+            except KeyError:
+                continue
             results.append(
-                (prefix + "avg-ops", op["throughput"]["average_ops"], "ops/s")
+                (f"{type_fio}-bw-mean", op["throughput"]["average_bps"], "byte/s")
             )
             results.append(
-                (prefix + "avg-bps", op["throughput"]["average_bps"], "byte/s")
+                (f"{type_fio}-iops-mean", op["throughput"]["average_ops"], "iops")
             )
-            results.append((prefix + "ops", op["throughput"]["operations"], "ops"))
 
         return results
 
