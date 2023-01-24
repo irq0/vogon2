@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 import collections
+import io
+import itertools
 import logging
 import pathlib
 import sqlite3
 
 import click
+import dominate
+import dominate.tags as T
+import matplotlib.pyplot as plt
+import numpy as np
 import rich
 from rich import print as pprint
 from rich.console import Console
@@ -48,6 +54,30 @@ def select_print_table(db, sql, params=()):
         table.add_row(*(str(col) for col in row))
     cur.close()
     console.print(table)
+
+
+def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel, title):
+    "Make bar graph with two bars (y_1, y_2) per label"
+    xaxis = np.arange(len(labels))
+    bar_width = 0.35
+    fig, ax = plt.subplots()
+    b_1 = ax.bar(xaxis - bar_width / 2, y_1, bar_width, label=y_1_label)
+    b_2 = ax.bar(xaxis + bar_width / 2, y_2, bar_width, label=y_2_label)
+
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.set_xticks(xaxis, labels)
+    ax.legend()
+
+    ax.bar_label(b_1, padding=3)
+    ax.bar_label(b_2, padding=3)
+
+    fig.tight_layout()
+
+    svg_fd = io.StringIO()
+    fig.savefig(svg_fd, format="svg")
+
+    return svg_fd.getvalue()
 
 
 class IncompatibleSuites(Exception):
@@ -178,61 +208,14 @@ def environ(ctx, suite_id):
 @click.pass_context
 def show(ctx, suite_id):
     "Testrun details"
-    cur = ctx.obj["db"].db.cursor()
-
+    db = ctx.obj["db"]
     console = Console()
+
     table = Table(show_header=False, box=rich.box.SIMPLE)
     table.add_column(style="green")
     table.add_column()
-
-    row = cur.execute(
-        """
-        SELECT
-        suites.suite_id,
-        suites.name,
-        suites.start,
-        suites.finished,
-        round((julianday(suites.finished)-julianday(suites.start)) * 24 * 60)
-          as runtime_min,
-        suites.description,
-        count(tests.test_id) as n_tests,
-        avg((julianday(tests.finished)-julianday(tests.start)) * 24 * 60)
-          as avg_test_runtime
-        FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
-          JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
-        WHERE suites.suite_id = ?
-        GROUP BY suites.suite_id
-        """,
-        (suite_id,),
-    ).fetchone()
-    for (k, _, _, _, _, _, _), v in zip(cur.description, row):
-        table.add_row(str(k), str(v))
-
-    row = cur.execute(
-        """
-        SELECT
-        environment.key,
-        environment.value
-        FROM suites JOIN environment ON (suites.suite_id = environment.suite_id)
-        WHERE suites.suite_id = ?
-        AND key IN (
-          'under-test-s3gw-version',
-          'under-test-image-id',
-          'under-test-image-tags',
-          'os-release',
-          'test-warp-version',
-          'test-image-id',
-          'test-image-tags',
-          'image-tags',
-          'disk-model',
-          'cpu-brand'
-        )
-        """,
-        (suite_id,),
-    ).fetchall()
-    for k, v in row:
-        table.add_row(str(k), str(v))
-
+    for k, v in db.get_testrun_details(suite_id).items():
+        table.add_row(k, v)
     console.print(table)
 
     table = Table(box=rich.box.SIMPLE)
@@ -240,25 +223,10 @@ def show(ctx, suite_id):
     table.add_column("Test ID")
     table.add_column("Repetition IDs")
 
-    tests = cur.execute(
-        """
-        SELECT
-        tests.test_id,
-        tests.name,
-        group_concat(test_repetitions.rep_id) as reps
-        FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
-          JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
-        WHERE suites.suite_id = ?
-        GROUP BY tests.test_id
-        ORDER BY tests.name
-        """,
-        (suite_id,),
-    ).fetchall()
-    for test_id, name, rep_ids in tests:
-        table.add_row(name, test_id, rep_ids)
+    for test_id, test in db.get_test_runs(suite_id).items():
+        table.add_row(test["name"], test_id, ", ".join(test["reps"]))
 
     console.print(table)
-    cur.close()
 
 
 @report.command()
@@ -378,3 +346,163 @@ def compare(ctx, suite_a, suite_b):
 
     make_comparison_table(db, suite_a, suite_b, add_headline, add_row)
     console.print(table)
+
+
+@report.command()
+@click.pass_context
+@click.option("--baseline-suite", type=str, required=True)
+@click.option(
+    "--out",
+    type=click.Path(
+        exists=False,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+)
+@click.argument("suite-ids", nargs=-1)
+def fancy(ctx, baseline_suite, out, suite_ids):
+    "Results comparison table"
+    db = ctx.obj["db"]
+    suites = [db.get_testrun_details(suite_id) for suite_id in suite_ids]
+    # TODO check that same suites were run
+
+    baseline_tests = db.get_test_runs(baseline_suite)
+    suite_tests = [db.get_test_runs(suite_id) for suite_id in suite_ids]
+
+    all_test_names = {name for test in suite_tests for name in test.keys()}
+
+    # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
+    def bar_graphs():
+        div = T.div()
+        baseline = baseline_tests[
+            "FIO(job_file=/home/vogon/vogon2/fio/fio-rand-RW.fio)"
+        ]
+        for test_name in all_test_names:
+            div.add(T.h3(test_name))
+            try:
+                rep_ids = [max(baseline["reps"])] + [
+                    max(t[test_name]["reps"]) for t in suite_tests
+                ]
+            except KeyError:
+                div.add(T.p("At least one test suite does not have this test :("))
+                continue
+            labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
+
+            # note: convert to MB
+            bw_read, bw_write = db.get_normalized_results("bw-mean", rep_ids)
+            bw_read, bw_write = [x / 1024**2 for x in bw_read], [
+                x / 1024**2 for x in bw_write
+            ]
+            fig = div.add(T.figure(style="display: inline-block"))
+            fig.add_raw_string(
+                make_comparison_bargraph_svg(
+                    labels,
+                    bw_read,
+                    bw_write,
+                    "read/GET",
+                    "write/PUT",
+                    "Throughput [MB/s]",
+                    "Throughput",
+                )
+            )
+
+            # note: skips baseline, fio iops not comparable with S3 ops
+            ops_read, ops_write = db.get_normalized_results("iops-mean", rep_ids[1:])
+            fig = div.add(T.figure(style="display: inline-block"))
+            fig.add_raw_string(
+                make_comparison_bargraph_svg(
+                    labels[1:],
+                    ops_read,
+                    ops_write,
+                    "GET",
+                    "PUT",
+                    "Ops [1/s]",
+                    "Operations",
+                )
+            )
+        return div
+
+    # Comparison Tables
+    def comparision_table(a, b):
+        div = T.div()
+        div.add(T.h3(f"{a['suite_id']:9.9} ➙ {b['suite_id']:9.9}"))
+        div.add(T.p(f"{a['under-test-s3gw-version']} ➙ {b['under-test-s3gw-version']}"))
+        table = div.add(T.table())
+        thead = table.add(T.thead())
+
+        def add_headline(headlines):
+            row = thead.add(T.tr())
+            for hd in headlines:
+                if isinstance(hd, tuple):
+                    row.add(T.th(T.strong(hd[0]), T.br(), hd[1]))
+                else:
+                    row.add(T.th(str(hd)))
+
+        tbody = table.add(T.tbody())
+
+        def add_row(row):
+            tbody.add(T.tr((T.td(T.span(val, title=detail)) for val, detail in row)))
+
+        try:
+            make_comparison_table(
+                db, a["suite_id"], b["suite_id"], add_headline, add_row
+            )
+        except IncompatibleSuites:
+            div.add(T.p("Tests suites incompatible"))
+
+        return div
+
+    # Test environment data
+    def env_table():
+        div = T.div()
+
+        # list of suite dicts -> dict of rows
+        combined = collections.defaultdict(list)
+        all_keys = {k for suite in suites for k in suite.keys()}
+        for suite in suites:
+            for k in all_keys:
+                combined[k].append(suite.get(k, "-"))
+
+        def sort_key_fn(thing):
+            if thing[0] in ("suite_id", "name"):
+                return "AAAAAAA"
+            elif thing[0].startswith("under-test-"):
+                return "BBBBBBB"
+            else:
+                return str(thing[0])
+
+        table = div.add(T.table())
+        tbody = table.add(T.body())
+        for k, vs in sorted(combined.items(), key=sort_key_fn):
+            with tbody.add(T.tr()):
+                T.th(str(k))
+                for v in vs:
+                    try:
+                        v = v.decode("utf-8")
+                    except (UnicodeDecodeError, AttributeError):
+                        pass
+                    if k == "suite_id":
+                        T.td(T.strong(v[:9]), v[9:])
+                    else:
+                        T.td(v)
+        return div
+
+    # Assemble report
+    doc = dominate.document(title="PR Performance Report")
+    with doc:
+        T.div(T.h1("PR Performance Report"), bar_graphs())
+
+        T.div(
+            T.h2("Comparision Tables"),
+            T.p("> 1 faster, = 1 no change, < 1 slower, > 1.3x 😎"),
+            (comparision_table(a, b) for a, b in itertools.combinations(suites, 2)),
+        )
+
+        T.div(T.h2("Test Environment"), env_table())
+
+    with open(out, "wb") as fd:
+        fd.write(doc.render().encode("utf-8"))

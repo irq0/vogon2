@@ -248,6 +248,131 @@ class ResultsDB:
 
         return cols_pos_lookup
 
+    def get_normalized_results(
+        self, key_suffix: str, rep_ids: list[str]
+    ) -> tuple[list[float], list[float]]:
+        """
+        Get results for rep_ids normalized to key_suffix for read and write operations.
+        Output one list per operation. Each entry a result for a single rep
+        """
+
+        read = []
+        write = []
+
+        with closing(self.db.cursor()) as cur:
+            for rep in rep_ids:
+                print(rep)
+                data = cur.execute(
+                    f"""
+                    SELECT value
+                    FROM results
+                    WHERE rep_id = ?
+                      AND key IN ('read-{key_suffix}', 'write-{key_suffix}')
+                    """,
+                    (rep,),
+                ).fetchall()
+                if not data:
+                    raise Exception(f"no data: {cur} {data} {rep}")
+                read.append(float(data[0][0]))
+                write.append(float(data[1][0]))
+
+        return (read, write)
+
+    def get_testrun_details(self, suite_id: IDType) -> dict[str, str]:
+        "Return testrun details (names, selected environment data) as key value dict"
+        results = {}
+        with closing(self.db.cursor()) as cur:
+            row = cur.execute(
+                """
+                SELECT
+                suites.suite_id,
+                suites.name,
+                suites.start,
+                suites.finished,
+                round((julianday(suites.finished)-julianday(suites.start)) * 24 * 60)
+                  as runtime_min,
+                suites.description,
+                count(tests.test_id) as n_tests,
+                avg((julianday(tests.finished)-julianday(tests.start)) * 24 * 60)
+                  as avg_test_runtime
+                FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
+                  JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
+                WHERE suites.suite_id = ?
+                GROUP BY suites.suite_id
+                """,
+                (suite_id,),
+            ).fetchone()
+            for (k, _, _, _, _, _, _), v in zip(cur.description, row):
+                try:
+                    k = k.decode("utf-8")
+                except (UnicodeDecodeError, AttributeError):
+                    k = str(k)
+                try:
+                    v = v.decode("utf-8")
+                except (UnicodeDecodeError, AttributeError):
+                    v = str(v)
+                results[k] = v
+
+            row = cur.execute(
+                """
+                SELECT
+                environment.key,
+                environment.value
+                FROM suites JOIN environment ON (suites.suite_id = environment.suite_id)
+                WHERE suites.suite_id = ?
+                AND key IN (
+                  'under-test-s3gw-version',
+                  'under-test-image-id',
+                  'under-test-image-tags',
+                  'os-release',
+                  'test-warp-version',
+                  'test-image-id',
+                  'test-image-tags',
+                  'image-tags',
+                  'disk-model',
+                  'cpu-brand'
+                )
+                """,
+                (suite_id,),
+            ).fetchall()
+            for k, v in row:
+                try:
+                    k = k.decode("utf-8")
+                except (UnicodeDecodeError, AttributeError):
+                    k = str(k)
+                try:
+                    v = v.decode("utf-8")
+                except (UnicodeDecodeError, AttributeError):
+                    v = str(v)
+                results[k] = v
+        return results
+
+    def get_test_runs(self, suite_id: IDType):
+        "Get test run information and rep_ids for test suite. Keyed by test name"
+        results = {}
+        with closing(self.db.cursor()) as cur:
+            tests = cur.execute(
+                """
+                SELECT
+                  tests.test_id,
+                  tests.name,
+                  group_concat(test_repetitions.rep_id) as reps
+                FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
+                  JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
+                WHERE suites.suite_id = ?
+                GROUP BY tests.test_id
+                ORDER BY tests.name
+                """,
+                (suite_id,),
+            ).fetchall()
+        for test_id, name, rep_ids in tests:
+            results[name] = {
+                "name": name,
+                "test_id": test_id,
+                "reps": rep_ids.split(),
+            }
+        return results
+
 
 def init_db(dbconn):
     """Initialize database
