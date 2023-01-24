@@ -2,9 +2,11 @@
 import collections
 import io
 import itertools
+import json
 import logging
 import pathlib
 import sqlite3
+from contextlib import closing
 
 import click
 import dominate
@@ -76,6 +78,26 @@ def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel,
 
     svg_fd = io.StringIO()
     fig.savefig(svg_fd, format="svg")
+    plt.close()
+
+    return svg_fd.getvalue()
+
+
+def make_percentiles_svg(ys, ylabel, title):
+    xaxis = np.arange(101)
+    fig, ax = plt.subplots()
+    ax.bar(xaxis, ys, width=2, linewidth=0.7, edgecolor="white")
+    ax.set_axisbelow(True)
+    ax.grid()
+    ax.set(xlim=(0, 100))
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    fig.tight_layout()
+
+    svg_fd = io.StringIO()
+    fig.savefig(svg_fd, format="svg")
+    plt.close()
 
     return svg_fd.getvalue()
 
@@ -456,6 +478,37 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
         return div
 
+    # Op latency
+    def warp_latency_graph(rep_id):
+        all_div = T.div()
+        with closing(db.db.cursor()) as cur:
+            data = json.loads(
+                cur.execute(
+                    """
+            SELECT value
+            FROM results
+            WHERE rep_id = ? and key = 'JSON'
+            """,
+                    (rep_id,),
+                ).fetchone()[0]
+            )
+            if not data:
+                all_div.add(T.p(f"No JSON results found for {rep_id}"))
+                return all_div
+            for op in data["operations"]:
+                if op["skipped"]:
+                    continue
+                fig = all_div.add(T.figure(style="display: inline-block"))
+                fig.add_raw_string(
+                    make_percentiles_svg(
+                        op["single_sized_requests"]["dur_percentiles_millis"],
+                        "Request latency [ms]",
+                        op["type"],
+                    )
+                )
+
+        return all_div
+
     # Test environment data
     def env_table():
         div = T.div()
@@ -491,6 +544,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         T.td(v)
         return div
 
+    pprint(suite_tests)
     # Assemble report
     doc = dominate.document(title="PR Performance Report")
     with doc:
@@ -503,6 +557,13 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         )
 
         T.div(T.h2("Test Environment"), env_table())
+
+        div = T.div(T.h2("Latency Graphs"))
+        for suite, tests in zip(suites, suite_tests):
+            div.add(T.h3(suite["suite_id"]))
+            for test_name, test in tests.items():
+                div.add(T.h4(test_name))
+                div.add(warp_latency_graph(max(test["reps"])))
 
     with open(out, "wb") as fd:
         fd.write(doc.render().encode("utf-8"))
