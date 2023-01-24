@@ -20,6 +20,8 @@
       - dstat
       - docker
       - ccache
+      - binutils
+      - attr
     state: present
 
 - name: enable systemd persistent journal
