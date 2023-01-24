@@ -101,7 +101,7 @@ def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
 @click.pass_context
 def cli(ctx, debug):
     ctx.ensure_object(dict)
-    loglevel = [logging.WARNING, logging.DEBUG][int(debug)]
+    loglevel = [logging.INFO, logging.DEBUG][int(debug)]
     logging.basicConfig(
         level=loglevel,
         format="%(message)s",
