@@ -659,7 +659,7 @@ test_suites = [
     ),
     TestSuite(
         "warp-mixed-long",
-        "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
+        "Warp mixed 30m",
         tests=[
             WarpTest(
                 "mixed-30m-default",
