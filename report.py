@@ -77,13 +77,17 @@ def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel,
     fig.tight_layout()
 
     svg_fd = io.StringIO()
-    fig.savefig(svg_fd, format="svg")
+    fig.savefig(svg_fd, format="svg", transparent=True)
     plt.close()
 
-    return svg_fd.getvalue()
+    svg = svg_fd.getvalue()
+    # hack: remove width and height to make it scalable with CSS
+    svg = svg.replace("width", "width_inactive", 1)
+    svg = svg.replace("height", "height_inactive", 1)
+    return svg
 
 
-def make_percentiles_svg(ys, ylabel, title):
+def make_percentiles_svg(ys, ylabel):
     xaxis = np.arange(101)
     fig, ax = plt.subplots()
     ax.bar(xaxis, ys, width=2, linewidth=0.7, edgecolor="white")
@@ -91,15 +95,16 @@ def make_percentiles_svg(ys, ylabel, title):
     ax.grid()
     ax.set(xlim=(0, 100))
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
-
     fig.tight_layout()
-
     svg_fd = io.StringIO()
-    fig.savefig(svg_fd, format="svg")
+    fig.savefig(svg_fd, format="svg", transparent=True)
     plt.close()
 
-    return svg_fd.getvalue()
+    svg = svg_fd.getvalue()
+    # hack: remove width and height to make it scalable with CSS
+    svg = svg.replace("width", "width_inactive", 1)
+    svg = svg.replace("height", "height_inactive", 1)
+    return svg
 
 
 class IncompatibleSuites(Exception):
@@ -399,18 +404,18 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
     # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
     def bar_graphs():
-        div = T.div()
+        all_div = T.div()
         baseline = baseline_tests[
             "FIO(job_file=/home/vogon/vogon2/fio/fio-rand-RW.fio)"
         ]
         for test_name in all_test_names:
-            div.add(T.h3(test_name))
+            all_div.add(T.h3(test_name))
             try:
                 rep_ids = [max(baseline["reps"])] + [
                     max(t[test_name]["reps"]) for t in suite_tests
                 ]
             except KeyError:
-                div.add(T.p("At least one test suite does not have this test :("))
+                all_div.add(T.p("At least one test suite does not have this test :("))
                 continue
             labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
 
@@ -419,7 +424,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             bw_read, bw_write = [x / 1024**2 for x in bw_read], [
                 x / 1024**2 for x in bw_write
             ]
-            fig = div.add(T.figure(style="display: inline-block"))
+
+            div = all_div.add(T.div(style="display: flex; flex-wrap: wrap;"))
+            fig = div.add(T.figure(style="width: 25rem;"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
                     labels,
@@ -434,7 +441,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
             # note: skips baseline, fio iops not comparable with S3 ops
             ops_read, ops_write = db.get_normalized_results("iops-mean", rep_ids[1:])
-            fig = div.add(T.figure(style="display: inline-block"))
+            fig = div.add(T.figure(style="width: 25rem;"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
                     labels[1:],
@@ -480,7 +487,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
     # Op latency
     def warp_latency_graph(rep_id):
-        all_div = T.div()
+        all_div = T.div(style="display: flex; flex-wrap: wrap;")
         with closing(db.db.cursor()) as cur:
             data = json.loads(
                 cur.execute(
@@ -498,12 +505,12 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             for op in data["operations"]:
                 if op["skipped"]:
                     continue
-                fig = all_div.add(T.figure(style="display: inline-block"))
+                fig = all_div.add(T.figure(style="width: 20rem;"))
+                fig.add(T.figcaption(op["type"]))
                 fig.add_raw_string(
                     make_percentiles_svg(
                         op["single_sized_requests"]["dur_percentiles_millis"],
                         "Request latency [ms]",
-                        op["type"],
                     )
                 )
 
