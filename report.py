@@ -447,7 +447,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     labels[1:], ops_read, ops_write, "GET", "PUT", "Ops [1/s]"
                 )
             )
-        return div
+        return all_div
 
     # Comparison Tables
     def comparision_table(a, b):
