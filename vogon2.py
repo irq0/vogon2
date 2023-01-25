@@ -673,24 +673,42 @@ test_suites = [
         "warp-mixed-long",
         "Warp mixed 30m",
         tests=[
+            # default warp mixed 45% GET, 30% STAT, 15% PUT, 10% DELETE,
             WarpTest(
-                "mixed-30m-get-put",
+                "mixed-30m-default",
                 "mixed",
-                ["--duration=30m", "--get-distrib=45", "--put-distrib=15"],
+                [
+                    "--duration=30m",
+                    "--get-distrib=45",
+                    "--stat-distrib=30",
+                    "--put-distrib=15",
+                    "--delete-distrib=10",
+                ],
             ),
+            # default warp mixed with > RAM size dataset
             WarpTest(
                 "mixed-30m-big",
                 "mixed",
                 [
                     "--duration=30m",
+                    "--get-distrib=45",
+                    "--stat-distrib=30",
+                    "--put-distrib=15",
+                    "--delete-distrib=10",
                     "--objects=30000",
                     "--obj.size=10MiB",
                 ],
             ),
+        ],
+    ),
+    TestSuite(
+        "ideas",
+        "?",
+        tests=[
             WarpTest(
-                "mixed-30m-default",
-                "mixed",
-                ["--duration=30m"],
+                "restric-alike",
+                "put",
+                ["--duration=30m", "--concurrent=5", "--obj.size=16MiB"],
             ),
         ],
     ),
