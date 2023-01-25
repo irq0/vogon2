@@ -86,13 +86,13 @@ def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel)
     return svg
 
 
-def make_percentiles_svg(ys, ylabel):
+def make_percentiles_svg(ys, ylabel, ymax):
     xaxis = np.arange(101)
     fig, ax = plt.subplots()
     ax.bar(xaxis, ys, width=2, linewidth=0.7, edgecolor="white")
     ax.set_axisbelow(True)
     ax.grid()
-    ax.set(xlim=(0, 100))
+    ax.set(xlim=(0, 100), ylim=(0, ymax))
     ax.set_ylabel(ylabel)
     fig.tight_layout()
     svg_fd = io.StringIO()
@@ -486,6 +486,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
     # Op latency
     def warp_latency_graph(rep_id):
+        op_ymax = {
+            "PUT": 2000,
+        }
         all_div = T.div(style="display: flex; flex-wrap: wrap;")
         with closing(db.db.cursor()) as cur:
             data = json.loads(
@@ -518,6 +521,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     make_percentiles_svg(
                         stats["dur_percentiles_millis"],
                         "Request latency [ms]",
+                        op_ymax.get(op["type"], 100),
                     )
                 )
                 fig.add(
