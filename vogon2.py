@@ -361,15 +361,19 @@ class WarpTest(ContainerizedTest):
         self.raw_results: str = ""
         self.json_results: dict = {}
 
-    def run(self, instance: "TestRunner"):
-        self.container = ContainerManager(instance.cri, self.container_image)
-        self.warp_version = self.container.run_once(command="--version").strip()
+    def make_args(self):
         args = []
         args.extend(self.default_args)
         args.append(self.workload)
         args.extend(self.default_workload_args)
         args.extend(self.args)
+        return args
 
+    def run(self, instance: "TestRunner"):
+        self.container = ContainerManager(instance.cri, self.container_image)
+        self.warp_version = self.container.run_once(command="--version").strip()
+        args = self.make_args()
+        LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
             command=args, network_mode="host", name=f"warp_{instance.rep_id}"
         )
