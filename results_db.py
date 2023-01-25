@@ -329,7 +329,10 @@ class ResultsDB:
                   'test-image-tags',
                   'image-tags',
                   'disk-model',
-                  'cpu-brand'
+                  'cpu-model',
+                  'cpu-count',
+                  'memtotalkb',
+                  'node-name'
                 )
                 """,
                 (suite_id,),
