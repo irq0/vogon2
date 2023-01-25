@@ -261,7 +261,6 @@ class ResultsDB:
 
         with closing(self.db.cursor()) as cur:
             for rep in rep_ids:
-                print(rep)
                 data = cur.execute(
                     f"""
                     SELECT value

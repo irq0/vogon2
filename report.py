@@ -544,7 +544,6 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         T.td(v)
         return div
 
-    pprint(suite_tests)
     # Assemble report
     doc = dominate.document(title="PR Performance Report")
     with doc:
