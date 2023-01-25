@@ -458,7 +458,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     def comparision_table(a, b):
         div = T.div()
         div.add(T.h3(f"{a['suite_id']:9.9} ➙ {b['suite_id']:9.9}"))
-        div.add(T.p(f"{a['under-test-s3gw-version']} ➙ {b['under-test-s3gw-version']}"))
+        div.add(T.p(f"{a['description']} ➙ {b['description']}"))
         table = div.add(T.table())
         thead = table.add(T.thead())
 
@@ -572,7 +572,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 combined[k].append(suite.get(k, "-"))
 
         def sort_key_fn(thing):
-            if thing[0] in ("suite_id", "name"):
+            if thing[0] in ("suite_id", "name", "description"):
                 return "AAAAAAA"
             elif thing[0].startswith("under-test-"):
                 return "BBBBBBB"
