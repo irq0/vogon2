@@ -198,6 +198,7 @@ def testruns(ctx):
     SELECT
       suites.suite_id,
       suites.start,
+      suites.description,
       round((julianday(suites.finished)-julianday(suites.start)) * 24 * 60)
         as runtime_min,
       suites.name,
