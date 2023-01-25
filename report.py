@@ -596,7 +596,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         return div
 
     # Assemble report
-    doc = dominate.document(title="PR Performance Report")
+    doc = dominate.document(title="PR Performance Report", lang="en")
+    with doc.head:
+        T.meta(http_equiv="Content-Type", content="text/html; charset=utf-8")
     with doc:
         T.div(T.h1("PR Performance Report"), bar_graphs())
 
