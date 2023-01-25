@@ -617,13 +617,6 @@ class TestRunner:
         )
 
 
-warp_mixed_default = WarpTest("mixed-default", "mixed")
-warp_get_default = WarpTest("get-default", "get")
-warp_put_default = WarpTest("put-default", "put")
-warp_list_default = WarpTest("list-default", "list")
-warp_delete_default = WarpTest("delete-default", "delete")
-warp_stat_default = WarpTest("stat-default", "stat")
-
 test_suites = [
     TestSuite(
         "baseline",
@@ -665,15 +658,15 @@ test_suites = [
         ],
     ),
     TestSuite(
-        "s3-simple-micro",
+        "warp-all-simple-default",
         "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
         tests=[
-            warp_mixed_default,
-            warp_get_default,
-            warp_put_default,
-            warp_list_default,
-            warp_delete_default,
-            warp_stat_default,
+            WarpTest("mixed-default", "mixed"),
+            WarpTest("get-default", "get"),
+            WarpTest("put-default", "put"),
+            WarpTest("list-default", "list"),
+            WarpTest("delete-default", "delete"),
+            WarpTest("stat-default", "stat"),
         ],
     ),
     TestSuite(
@@ -681,14 +674,23 @@ test_suites = [
         "Warp mixed 30m",
         tests=[
             WarpTest(
+                "mixed-30m-get-put",
+                "mixed",
+                ["--duration=30m", "--get-distrib=45", "--put-distrib=15"],
+            ),
+            WarpTest(
+                "mixed-30m-big",
+                "mixed",
+                [
+                    "--duration=30m",
+                    "--objects=30000",
+                    "--obj.size=10MiB",
+                ],
+            ),
+            WarpTest(
                 "mixed-30m-default",
                 "mixed",
                 ["--duration=30m"],
-            ),
-            WarpTest(
-                "mixed-30m-get-put",
-                "mixed",
-                ["--duration=30m", "--get-distrib=70", "--put-distrib=30"],
             ),
         ],
     ),
