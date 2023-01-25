@@ -198,7 +198,11 @@ def testruns(ctx):
     SELECT
       suites.suite_id,
       suites.start,
-      suites.description,
+      case
+        when length(suites.description) > 20
+        then substr(suites.description, 1, 20) || "..."
+        else suites.description
+      end as comment,
       round((julianday(suites.finished)-julianday(suites.start)) * 24 * 60)
         as runtime_min,
       suites.name,
