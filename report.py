@@ -58,7 +58,7 @@ def select_print_table(db, sql, params=()):
     console.print(table)
 
 
-def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel, title):
+def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel):
     "Make bar graph with two bars (y_1, y_2) per label"
     xaxis = np.arange(len(labels))
     bar_width = 0.35
@@ -67,7 +67,6 @@ def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel,
     b_2 = ax.bar(xaxis + bar_width / 2, y_2, bar_width, label=y_2_label)
 
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
     ax.set_xticks(xaxis, labels)
     ax.legend()
 
@@ -427,6 +426,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
             div = all_div.add(T.div(style="display: flex; flex-wrap: wrap;"))
             fig = div.add(T.figure(style="width: 25rem;"))
+            fig.add(T.figcaption("Throughput"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
                     labels,
@@ -435,22 +435,16 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     "read/GET",
                     "write/PUT",
                     "Throughput [MB/s]",
-                    "Throughput",
                 )
             )
 
             # note: skips baseline, fio iops not comparable with S3 ops
             ops_read, ops_write = db.get_normalized_results("iops-mean", rep_ids[1:])
             fig = div.add(T.figure(style="width: 25rem;"))
+            fig.add(T.figcaption("Operations"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
-                    labels[1:],
-                    ops_read,
-                    ops_write,
-                    "GET",
-                    "PUT",
-                    "Ops [1/s]",
-                    "Operations",
+                    labels[1:], ops_read, ops_write, "GET", "PUT", "Ops [1/s]"
                 )
             )
         return div
@@ -505,16 +499,61 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             for op in data["operations"]:
                 if op["skipped"]:
                     continue
-                fig = all_div.add(T.figure(style="width: 20rem;"))
-                fig.add(T.figcaption(op["type"]))
+                fig = all_div.add(
+                    T.figure(
+                        style="width: 20rem;",
+                        title=(
+                            "Request duration percentiles in milliseconds,"
+                            f" test rep {rep_id}"
+                        ),
+                    )
+                )
+                stats = op["single_sized_requests"]
                 fig.add_raw_string(
                     make_percentiles_svg(
-                        op["single_sized_requests"]["dur_percentiles_millis"],
+                        stats["dur_percentiles_millis"],
                         "Request latency [ms]",
                     )
                 )
-
+                fig.add(
+                    T.figcaption(
+                        T.table(
+                            T.tr(
+                                T.td("op"),
+                                T.td("fastest [ms]"),
+                                T.td("slowest [ms]"),
+                                T.td("avg [ms]"),
+                                T.td("median [ms]"),
+                            ),
+                            T.tr(
+                                T.th(op["type"]),
+                                T.td(stats["fastest_millis"]),
+                                T.td(stats["slowest_millis"]),
+                                T.td(stats["dur_avg_millis"]),
+                                T.td(stats["dur_median_millis"]),
+                            ),
+                        )
+                    )
+                )
         return all_div
+
+    # Tabulate latency graphs by testname sections with row per suite
+    def latency_table():
+        div = T.div()
+        for row_test_name in all_test_names:
+            div.add(T.h3(row_test_name))
+            table = div.add(T.table())
+            table.add(T.tr(T.th("Test"), T.th("")))
+            for suite, tests in zip(suites, suite_tests):
+                for test_name, test in tests.items():
+                    if row_test_name == test_name:
+                        table.add(
+                            T.tr(
+                                T.th(f"{suite['suite_id']:9.9}"),
+                                T.td(warp_latency_graph(max(test["reps"]))),
+                            )
+                        )
+        return div
 
     # Test environment data
     def env_table():
@@ -564,12 +603,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
         T.div(T.h2("Test Environment"), env_table())
 
-        div = T.div(T.h2("Latency Graphs"))
-        for suite, tests in zip(suites, suite_tests):
-            div.add(T.h3(suite["suite_id"]))
-            for test_name, test in tests.items():
-                div.add(T.h4(test_name))
-                div.add(warp_latency_graph(max(test["reps"])))
+        T.div(T.h2("Latency Graphs"), latency_table())
 
     with open(out, "wb") as fd:
         fd.write(doc.render().encode("utf-8"))
+
+    print("done")
