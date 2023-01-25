@@ -306,7 +306,12 @@ class FIOTest(HostTest):
         return 0
 
     def env(self, instance: "TestRunner"):
-        return {"fio-version": self.data["fio version"]}
+        with open(self.job_file) as fd:
+            jobfile = fd.read()
+        return {
+            "fio-version": self.data["fio version"],
+            "fio-jobfile": jobfile,
+        }
 
     def results(self, instance: "TestRunner"):
         result = [
