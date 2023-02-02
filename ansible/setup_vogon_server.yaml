@@ -1,13 +1,22 @@
 ---
-- name: Set up vogon server
-  hosts: vogon
+- name: Server base
+  hosts: all
   roles:
-    - packages
     - user-accounts
+    - packages
+
+- name: Partitions
+  hosts: equinix
+  roles:
+    - storage-partitions
+
+- name: Storage
+  hosts: all
+  roles:
     - storage
 
 - name: Install vogon2
-  hosts: vogon
+  hosts: all
   become: yes
   become_user: vogon
   roles:

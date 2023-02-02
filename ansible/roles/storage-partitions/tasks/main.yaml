@@ -1,0 +1,20 @@
+- name: Partition vogon disks
+  community.general.parted:
+    device: '{{ item }}'
+    number: 1
+    state: present
+    fs_type: ext4
+    align: optimal
+    label: gpt
+    name: vogon
+  loop: '{{ vogon_disks }}'
+
+- name: make vogon user own vogon partitions
+  ansible.builtin.file:
+    path: '{{ item }}-part1'
+    state: file
+    owner: vogon
+    group: vogon
+    mode: '0660'
+    follow: true
+  loop: '{{ vogon_disks }}'

@@ -1,3 +1,4 @@
 vogon_virtualenv: "/tmp/vogon2-py-venv"
+vogon_python: '/usr/bin/python3.10'
 vogon_sched:
   environment:

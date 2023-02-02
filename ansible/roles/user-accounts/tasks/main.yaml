@@ -4,6 +4,12 @@
     name: vogon
     state: present
 
+- name: docker group (also for podman socket)
+  ansible.builtin.group:
+    name: docker
+    state: present
+    gid: 1750
+
 - name: vogon user
   ansible.builtin.user:
     name: vogon
@@ -11,6 +17,7 @@
     groups:
       - vogon
       - docker
+      - disk
     shell: /bin/bash
     password: "!"
 

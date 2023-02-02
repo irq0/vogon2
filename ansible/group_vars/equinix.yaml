@@ -1,0 +1,4 @@
+# rocky linux 9 doesn't have python 3.10
+vogon_python: '/usr/bin/python3.9'
+# rocky linux 9 doesn't have docker only the podman compat
+container_runtime: podman

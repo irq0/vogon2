@@ -1,6 +1,14 @@
 ---
 all:
   children:
-    vogon:
+    equinix:
+      children:
+        c3_medium_x86:
+          vars:
+            ansible_user: root
+          hosts:
+            c3_medium_x86_1:
+    snowflakes:
       hosts:
         ares:
+        amaryl:

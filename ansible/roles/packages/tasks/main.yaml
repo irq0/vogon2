@@ -1,27 +1,43 @@
 ---
+- name: install packages (SUSE)
+  ansible.builtin.package:
+    name:
+      - python310
+      - python310-setuptools
+      - python310-pip
+      - sqlite3
+    state: present
+  when: 'ansible_facts["distribution"] == "SUSE"'
+
+- name: install packages (Rocky)
+  ansible.builtin.package:
+    name:
+      - epel-release
+      - python3
+      - python3-setuptools
+      - python3-pip
+      - sqlite
+    state: present
+  when: 'ansible_facts["distribution"] == "Rocky"'
+
 - name: Install packages
-  community.general.zypper:
+  ansible.builtin.package:
     name:
       - htop
       - smartmontools
       - zsh
       - git-core
-      - screen
       - tmux
       - lshw
-      - sqlite3
-      - python310
-      - python310-setuptools
-      - python310-pip
       - fio
       - sudo
       - iotop
       - sysstat
       - dstat
-      - docker
       - ccache
       - binutils
       - attr
+      - parted
     state: present
 
 - name: enable systemd persistent journal
@@ -30,15 +46,54 @@
     mode: "0755"
     state: directory
 
-- name: docker daemon config
-  copy:
-    src: daemon.json
-    dest: /etc/docker/daemon.json
-    mode: '0644'
 
-- name: enable docker service
-  ansible.builtin.systemd:
-    state: started
-    name: docker
-    enabled: true
-    masked: false
+- name: docker
+  when: container_runtime == 'docker'
+  block:
+    - name: Install packages
+      ansible.builtin.package:
+        name:
+          - docker
+    - name: docker daemon config
+      copy:
+        src: daemon.json
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+
+    - name: enable docker service
+      ansible.builtin.systemd:
+        state: started
+        name: docker
+        enabled: true
+        masked: false
+
+- name: podman
+  when: container_runtime == 'podman'
+  block:
+    - name: Install packages
+      ansible.builtin.package:
+        name:
+          - podman
+
+    - name: enable podman service
+      ansible.builtin.systemd:
+        state: started
+        name: podman
+        enabled: true
+        masked: false
+
+    - name: podman sock dir
+      ansible.builtin.file:
+        path: '/run/podman'
+        state: directory
+        owner: root
+        group: docker
+        mode: '0755'
+
+    - name: podman sock
+      ansible.builtin.file:
+        path: '/run/podman/podman.sock'
+        state: touch
+        owner: root
+        group: docker
+        mode: '0660'
