@@ -5,11 +5,11 @@
     version: master
     single_branch: yes
 
-- name: virtualenv (python 3.10 distros)
+- name: virtualenv
   ansible.builtin.pip:
     requirements: /home/vogon/vogon2/requirements.txt
     virtualenv: '{{ vogon_virtualenv }}'
-    virtualenv_command: '{{ vogon_python }}/usr/bin/python3.10 -m venv'
+    virtualenv_command: '{{ vogon_python }} -m venv'
 
 - name: scheduler config
   ansible.builtin.template:
