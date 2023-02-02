@@ -1,5 +1,5 @@
 - name: Install vogon2
-  hosts: vogon
+  hosts: all
   become: yes
   become_user: vogon
   roles:
