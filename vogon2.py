@@ -868,8 +868,6 @@ def test(
 ):
     cri = docker.DockerClient(base_url=docker_api)
     dbconn = sqlite3.connect(sqlite)
-    if init_db:
-        results_db.init_db(dbconn)
     cur = dbconn.cursor()
     cur.execute("PRAGMA foreign_keys = ON;")
     cur.close()

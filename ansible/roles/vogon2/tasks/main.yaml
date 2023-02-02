@@ -26,6 +26,14 @@
     group: vogon
     mode: '0755'
 
+- name: archive dir
+  ansible.builtin.file:
+    path: '{{ vogon_sched.environment.VOGON_ARCHIVE_DIR }}'
+    state: directory
+    owner: vogon
+    group: vogon
+    mode: '0755'
+
 - name: scheduler subdirs
   ansible.builtin.file:
     path: '/home/vogon/sched/{{ item }}'
@@ -38,6 +46,13 @@
     - failed
     - done
     - running
+
+- name: create empty database if not exists
+  ansible.builtin.shell:
+    cmd: |
+      source /home/vogon/vogon2-py-venv/bin/activate
+      /home/vogon/vogon2/vogon2.py init-db --sqlite {{ vogon_sched.environment.VOGON_SQLITE }}
+    creates: '{{ vogon_sched.environment.VOGON_SQLITE }}'
 
 - name: testrun
   ansible.builtin.shell: |
