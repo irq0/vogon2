@@ -837,7 +837,6 @@ def cli(ctx, debug):
     required=True,
     help="Where to find the sqlite database?",
 )
-@click.option("--init-db/--no-init-db", default=False, help="Create tables, etc")
 @click.option(
     "--reset-storage/--no-reset-storage",
     envvar="VOGON_RESET_STORAGE",
@@ -864,7 +863,6 @@ def test(
     mkfs,
     docker_api,
     sqlite,
-    init_db,
     reset_storage,
     repeat,
 ):
@@ -887,6 +885,23 @@ def test(
     finally:
         s3gw.terminate()
         dbconn.close()
+
+
+@cli.command()
+@click.option(
+    "--sqlite",
+    type=str,
+    envvar="VOGON_SQLITE",
+    show_default=True,
+    required=True,
+    help="Where to find the sqlite database?",
+)
+def init_db(sqlite):
+    dbconn = sqlite3.connect(sqlite)
+    results_db.init_db(dbconn)
+    cur = dbconn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+    cur.close()
 
 
 if __name__ == "__main__":
