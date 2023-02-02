@@ -680,18 +680,6 @@ test_suites = [
         "warp-mixed-long",
         "Warp mixed 30m",
         tests=[
-            # default warp mixed 45% GET, 30% STAT, 15% PUT, 10% DELETE,
-            WarpTest(
-                "mixed-30m-default",
-                "mixed",
-                [
-                    "--duration=30m",
-                    "--get-distrib=45",
-                    "--stat-distrib=30",
-                    "--put-distrib=15",
-                    "--delete-distrib=10",
-                ],
-            ),
             # default warp mixed with > RAM size dataset
             WarpTest(
                 "mixed-30m-big",
