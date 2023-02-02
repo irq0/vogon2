@@ -73,10 +73,15 @@ class ResultsDB:
         env["os-release"] = platform.release()
         env["os-version"] = platform.version()
         env["node-name"] = platform.node()
+        env["vogon-platform"] = platform.platform()
 
-        dist = platform.freedesktop_os_release()
-        env["vogon_dist_name"] = dist["NAME"]
-        env["vogon_dist_version"] = dist["VERSION_ID"]
+        try:
+            dist = platform.freedesktop_os_release()
+            env["vogon-dist-name"] = dist["NAME"]
+            env["vogon-dist-version"] = dist["VERSION_ID"]
+        except AttributeError:
+            env["vogon-dist-name"] = "unknown"
+            env["vogon-dist-version"] = "unknown"
 
         with open("/proc/meminfo") as file:
             for line in file:
