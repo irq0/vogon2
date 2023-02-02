@@ -623,6 +623,13 @@ test_suites = [
         "Test disk baseline performance",
         tests=[
             FIOTest("fio-rand-RW", SCRIPT_PATH / "fio" / "fio-rand-RW.fio"),
+        ],
+    ),
+    TestSuite(
+        "fio-read-write-rw",
+        "Test disk baseline performance",
+        tests=[
+            FIOTest("fio-rand-RW", SCRIPT_PATH / "fio" / "fio-rand-RW.fio"),
             FIOTest("fio-rand-read", SCRIPT_PATH / "fio" / "fio-rand-read.fio"),
             FIOTest("fio.rand-write", SCRIPT_PATH / "fio" / "fio-rand-write.fio"),
         ],
