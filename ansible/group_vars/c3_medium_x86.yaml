@@ -6,8 +6,8 @@ vogon_virtualenv: "/home/vogon/vogon2-py-venv"
 vogon_sched:
   virtualenv: "/home/vogon/vogon2-py-venv"
   environment:
-    VOGON_STORAGE_DEVICE: "/dev/disk/by-id//dev/disk/by-path/pci-0000:01:00.0-sas-phy0-lun-0"
-    VOGON_STORAGE_PARTITION: "/dev/disk/by-id//dev/disk/by-path/pci-0000:01:00.0-sas-phy0-lun-0-part1"
+    VOGON_STORAGE_DEVICE: "/dev/disk/by-path/pci-0000:01:00.0-sas-phy0-lun-0"
+    VOGON_STORAGE_PARTITION: "/dev/disk/by-path/pci-0000:01:00.0-sas-phy0-lun-0-part1"
     VOGON_MOUNTPOINT: "/home/vogon/mnt/"
     VOGON_MKFS: "/sbin/mkfs.ext4"
     VOGON_DOCKER_API: "unix://run/docker.sock"
