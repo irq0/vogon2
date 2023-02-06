@@ -6,6 +6,7 @@
       - python310-setuptools
       - python310-pip
       - sqlite3
+      - python3-docker-compose
     state: present
   when: 'ansible_facts["distribution"] == "SLES"'
 
