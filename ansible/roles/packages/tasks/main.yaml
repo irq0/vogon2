@@ -7,7 +7,7 @@
       - python310-pip
       - sqlite3
     state: present
-  when: 'ansible_facts["distribution"] == "SUSE"'
+  when: 'ansible_facts["distribution"] == "SLES"'
 
 - name: install packages (Rocky)
   ansible.builtin.package:
