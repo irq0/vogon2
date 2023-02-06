@@ -1,0 +1,37 @@
+---
+- name: systemd service config
+  copy:
+    src: docker-compose@.service
+    dest: /etc/systemd/system/docker-compose@.service
+    mode: "0644"
+  notify:
+    - reload systemd
+
+- name: docker compose etc dir
+  file:
+    path: /etc/docker-compose/monitoring-stack
+    state: directory
+    mode: "0755"
+
+- name: compose config
+  template:
+    src: docker-compose.yaml.j2
+    dest: /etc/docker-compose/monitoring-stack/docker-compose.yaml
+    mode: "0644"
+  notify:
+    - restart stack
+
+- name: prom config
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/docker-compose/monitoring-stack/prometheus.yml
+    mode: "0644"
+  notify:
+    - reload prom config
+
+- name: enable compose service
+  ansible.builtin.systemd:
+    state: started
+    name: docker-compose@monitoring-stack.service
+    enabled: true
+    masked: false

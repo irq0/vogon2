@@ -1,0 +1,14 @@
+---
+- name: reload prom config
+  ansible.builtin.uri:
+    url: http://10.23.1.5:9090/-/reload
+    method: POST
+
+- name: restart stack
+  service:
+    name: docker-compose@monitoring-stack
+    state: restarted
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
