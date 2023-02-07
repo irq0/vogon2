@@ -10,6 +10,11 @@
   roles:
     - storage-partitions
 
+- name: Monitoring Stack
+  hosts: ares
+  roles:
+    - monitoring-stack
+
 - name: Storage
   hosts: all
   roles:
