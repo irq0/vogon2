@@ -101,7 +101,7 @@ class S3GW(ContainerManager):
                 "--debug-rgw",
                 "1",
                 "--rgw-frontends",
-                "beast port=7480, status bind=127.0.0.1 port=9090",
+                "beast port=7480, status bind=0.0.0.0 port=9090",
             ],
         )
         ret, version = self.container.exec_run(["radosgw", "--version"])
