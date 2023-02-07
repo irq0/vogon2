@@ -7,6 +7,7 @@ scrape_configs:
       - targets:
         - node-exporter:9100
   - job_name: 's3gw-status'
+    metrics_path: '/prometheus'
     static_configs:
       - targets:
         - host.docker.internal:9090
