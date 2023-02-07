@@ -689,6 +689,31 @@ test_suites = [
         ],
     ),
     TestSuite(
+        "warp-upload",
+        "Warp: Data Upload",
+        tests=[
+            WarpTest(
+                "put-c20-uniform20M-nomulti",
+                "put",
+                [
+                    "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--disable-multipart",
+                ],
+            ),
+            WarpTest(
+                "put-c20-uniform20M-multi",
+                "put",
+                [
+                    "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                ],
+            ),
+        ],
+    ),
+    TestSuite(
         "warp-mixed-long",
         "Warp mixed 30m",
         tests=[
