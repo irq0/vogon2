@@ -39,6 +39,8 @@
       - binutils
       - attr
       - parted
+      - perf
+      - bcc-tools
     state: present
 
 - name: enable systemd persistent journal
