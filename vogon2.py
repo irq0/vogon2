@@ -91,6 +91,18 @@ class S3GW(ContainerManager):
                     "mode": "rw",
                 }
             },
+            command=[
+                "--rgw-backend-store",
+                "sfs",
+                "--rgw-enable-ops-log",
+                "0",
+                "--rgw-log-object-name",
+                "0",
+                "--debug-rgw",
+                "1",
+                "--rgw-frontends",
+                "beast port=7480, status bind=127.0.0.1 port=9090",
+            ],
         )
         ret, version = self.container.exec_run(["radosgw", "--version"])
         if ret == 0:
