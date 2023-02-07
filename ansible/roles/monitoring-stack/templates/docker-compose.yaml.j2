@@ -25,8 +25,10 @@ services:
     ports:
       - '127.0.0.1:3000:3000'
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_NAME: 's3gw'
+      GF_SECURITY_ADMIN_USER: 'admin'
+      GF_SECURITY_ADMIN_PASSWORD: 'admin'
     volumes:
       - grafana-storage:/var/lib/grafana:rw
     restart: unless-stopped
