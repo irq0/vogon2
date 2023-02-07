@@ -371,6 +371,7 @@ class WarpTest(ContainerizedTest):
         self.workload = workload
         self.args = args
         self.raw_results: str = ""
+        self.warp_version: str = "unknown"
         self.json_results: dict = {}
 
     def make_args(self):
@@ -383,14 +384,19 @@ class WarpTest(ContainerizedTest):
 
     def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
-        self.warp_version = self.container.run_once(command="--version").strip()
-        LOG.debug("Warp version string: %s", self.warp_version)
         args = self.make_args()
         LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
             command=args, network_mode="host", name=f"warp_{instance.rep_id}"
         )
         LOG.info("🔎 Warp container: %s", running.name)
+
+        ret, version = running.exec_run(cmd=["/warp", "--version"])
+        if ret == 0:
+            self.warp_version = version
+        else:
+            LOG.warning(f"warp --version fail: {ret} {version}")
+        LOG.debug("Warp version string: %s", self.warp_version)
 
         result = running.wait()
         self.last_run = running
