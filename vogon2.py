@@ -33,7 +33,7 @@ class ContainerManager:
         self.cri = cri
         if pull_image:
             self.image = self.cri.images.pull(image)
-            LOG.debug("Pulling image %s", self.image)
+            LOG.debug("Pulled image %s", self.image)
         else:
             self.image = self.cri.images.get(image)
             LOG.debug("Using image %s", self.image)
@@ -384,6 +384,7 @@ class WarpTest(ContainerizedTest):
     def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
         self.warp_version = self.container.run_once(command="--version").strip()
+        LOG.debug("Warp version string: %s", self.warp_version)
         args = self.make_args()
         LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
