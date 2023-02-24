@@ -401,11 +401,13 @@ class WarpTest(ContainerizedTest):
         )
         LOG.info("🔎 Warp container: %s", running.name)
 
-        time.sleep(1)  # ~ time it takes for usage errors to appear
-        if running.status != "running":
+        time.sleep(2)  # ~ time it takes for usage errors to appear
+        if running.status == "exited":
             LOG.error(
                 "💩 Looks like warp crashed after start. "
-                "Incorrect parameters. Check logs"
+                'State: "%s". '
+                "Incorrect parameters? Suggest checking logs",
+                running.status,
             )
             raise Exception(f"warp failed after start: {running.logs()}")
 
