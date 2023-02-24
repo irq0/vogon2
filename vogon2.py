@@ -724,7 +724,6 @@ test_suites = [
                     "--concurrent=20",
                     "--duration=10m",
                     "--obj.size=32MiB",
-                    "--objects=8192",
                     "--disable-multipart",
                     "--obj.randsize=false",
                 ],
@@ -736,7 +735,6 @@ test_suites = [
                     "--concurrent=20",
                     "--duration=10m",
                     "--obj.size=32MiB",
-                    "--objects=8192",
                     "--obj.randsize=false",
                 ],
             ),
@@ -749,7 +747,6 @@ test_suites = [
                     "--obj.size=256,128MiB",
                     "--obj.generator=random",
                     "--obj.randsize=true",
-                    "--objects=2048",
                 ],
             ),
             WarpTest(
