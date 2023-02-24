@@ -92,7 +92,6 @@ def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
             if job:
                 yield job
         else:
-            LOG.info(f"no jobs found. sleeping {SLEEP_TIME_SEC}s")
             time.sleep(SLEEP_TIME_SEC)
 
 
