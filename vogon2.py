@@ -401,6 +401,14 @@ class WarpTest(ContainerizedTest):
         )
         LOG.info("🔎 Warp container: %s", running.name)
 
+        time.sleep(1)  # ~ time it takes for usage errors to appear
+        if running.status != "running":
+            LOG.error(
+                "💩 Looks like warp crashed after start. "
+                "Incorrect parameters. Check logs"
+            )
+            raise Exception(f"warp failed after start: {running.logs()}")
+
         ret, version = running.exec_run(cmd=["/warp", "--version"])
         if ret == 0:
             self.warp_version = version
