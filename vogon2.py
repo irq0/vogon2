@@ -790,7 +790,7 @@ test_suites = [
                 [
                     "--concurrent=20",
                     "--duration=10m",
-                    "--obj.size=1",
+                    "--obj.size=256",
                     "--obj.randsize=false",
                     "--objects=1000",
                 ],
@@ -801,7 +801,7 @@ test_suites = [
                 [
                     "--concurrent=20",
                     "--duration=10m",
-                    "--obj.size=1",
+                    "--obj.size=256",
                     "--obj.randsize=false",
                     "--objects=10000",
                 ],
