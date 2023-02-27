@@ -752,6 +752,27 @@ test_suites = [
                 ],
             ),
             WarpTest(
+                "put-c1-uniform32M-nomulti",
+                "put",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--disable-multipart",
+                    "--obj.randsize=false",
+                ],
+            ),
+            WarpTest(
+                "put-c1-uniform32M-multi",
+                "put",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                ],
+            ),
+            WarpTest(
                 "get-c20-uniform32M",
                 "get",
                 [
@@ -787,6 +808,41 @@ test_suites = [
                 ],
             ),
             WarpTest(
+                "get-c1-uniform32M",
+                "get",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                    "--objects=8192",
+                ],
+            ),
+            WarpTest(
+                "get-c1-uniform32M-ranged",
+                "get",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                    "--objects=8192",
+                    "--range",
+                ],
+            ),
+            WarpTest(
+                "get-c1-random265-128M",
+                "get",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=256,128MiB",
+                    "--obj.generator=random",
+                    "--obj.randsize=true",
+                    "--objects=2048",
+                ],
+            ),
+            WarpTest(
                 "list-c20-1k",
                 "list",
                 [
@@ -802,6 +858,28 @@ test_suites = [
                 "list",
                 [
                     "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--obj.randsize=false",
+                    "--objects=10000",
+                ],
+            ),
+            WarpTest(
+                "list-c1-1k",
+                "list",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--obj.randsize=false",
+                    "--objects=1000",
+                ],
+            ),
+            WarpTest(
+                "list-c1-10k",
+                "list",
+                [
+                    "--concurrent=1",
                     "--duration=10m",
                     "--obj.size=256",
                     "--obj.randsize=false",
@@ -835,6 +913,17 @@ test_suites = [
                 "delete",
                 [
                     "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                    "--objects=8192",
+                ],
+            ),
+            WarpTest(
+                "delete-c1-uniform32M",
+                "delete",
+                [
+                    "--concurrent=1",
                     "--duration=10m",
                     "--obj.size=32MiB",
                     "--obj.randsize=false",
