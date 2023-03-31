@@ -1,3 +1,4 @@
+apprise
 click
 docker
 dominate

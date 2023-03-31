@@ -6,6 +6,7 @@ import subprocess
 import time
 from datetime import datetime
 
+import apprise
 import click
 from rich.logging import RichHandler
 
@@ -95,6 +96,25 @@ def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
             time.sleep(SLEEP_TIME_SEC)
 
 
+def make_notify(apprise_urls: list[str]):
+    if apprise_urls:
+        ap = apprise.Apprise()
+        for url in apprise_urls:
+            ap.add(url)
+
+        def logplusapprise(title, body):
+            LOG.info(f"{title}: {body}")
+            ap.notify(title=title, body=body)
+
+        return logplusapprise
+    else:
+
+        def logonly(title, body):
+            LOG.info(f"{title}: {body}")
+
+        return logonly
+
+
 @click.group()
 @click.option("--debug/--no-debug", default=False)
 @click.pass_context
@@ -150,8 +170,6 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
         raise click.BadParameter(f"sched dir must contain {required_dirs} subdirs")
 
     for job in todo_iter(todo, failed):
-        LOG.info(f"🏃 {job}")
-
         try:
             with open(config_file) as fd:
                 config = json.load(fd)
@@ -161,6 +179,9 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
             time.sleep(10)
             continue
 
+        notify = make_notify(config.get("notify", []))
+        notify(title="🏃", body=str(job))
+
         job.move(running)
         try:
             job.run(config)
@@ -168,13 +189,14 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
             LOG.info(f"moving interrupted job {job} to failed")
             job.move(failed)
         except subprocess.CalledProcessError:
-            LOG.error(f"💣 {job}")
+            notify(title="💣", body=str(job))
             job.move(failed)
-        except Exception:
+        except Exception as ex:
             LOG.exception(f"💣 {job}", exc_info=True)
+            notify(title="💣", body=f"{job} - {ex}")
             job.move(failed)
         else:
-            LOG.info(f"🏁 {job}")
+            notify(title="🏁", body=str(job))
             job.move(done)
 
 
