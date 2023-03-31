@@ -8,12 +8,14 @@ from datetime import datetime
 
 import apprise
 import click
+import requests
 from rich.logging import RichHandler
 
 
 SCRIPT_PATH = pathlib.Path(__file__).parent
 LOG = logging.getLogger("vogon-sched")
 SLEEP_TIME_SEC = 2
+AUTOGEN_SLEEP_TIME_SEC = 600
 
 
 class Job:
@@ -96,6 +98,40 @@ def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
             time.sleep(SLEEP_TIME_SEC)
 
 
+def latest_quay_tags(repo):
+    quay_repo = requests.get(
+        f"https://quay.io/api/v1/repository/{repo}"
+        "/tag/?limit=100&page=1&onlyActiveTags=true"
+    ).json()
+    result = [t["name"] for t in quay_repo["tags"]]
+    return result
+
+
+def remember_seen_iter(tags_fn, seen_file: pathlib.Path):
+    while True:
+        try:
+            with open(seen_file) as fd:
+                seen = set(fd.read().split(";"))
+        except FileNotFoundError:
+            seen = set()
+
+        seen.add("latest")
+        seen.add("nightly-latest")
+        tags = [t for t in tags_fn() if t not in seen]
+        LOG.debug("Found unseen tags on quay: %s", tags)
+
+        for tag in tags:
+            yield tag
+            seen.add(tag)
+
+        with open(seen_file, "w") as fd:
+            fd.truncate()
+            fd.seek(0)
+            fd.write(";".join(seen))
+
+        time.sleep(AUTOGEN_SLEEP_TIME_SEC)
+
+
 def make_notify(apprise_urls: list[str]):
     if apprise_urls:
         ap = apprise.Apprise()
@@ -127,6 +163,56 @@ def cli(ctx, debug):
         datefmt="[%Y-%m-%d %H:%M:%S]",
         handlers=[RichHandler(rich_tracebacks=True)],
     )
+
+
+@cli.command()
+@click.pass_context
+@click.option(
+    "--todo-dir",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+    help="Scheduler todo directory",
+)
+@click.option(
+    "--seen-dir",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+    help="Scheduler todo directory",
+)
+def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
+    # quay s3gw/s3gw
+    repo = "s3gw/s3gw"
+    for tag in remember_seen_iter(
+        lambda: latest_quay_tags(repo), seen_dir / "s3gw_s3gw"
+    ):
+        image = f"quay.io/{repo}:{tag}"
+        task = {
+            "under_test_image": image,
+            "under_test_image_pull": "true",
+            "suite": "warp-mixed-long",
+        }
+        task_fn = f"auto_warp-mixed-long_{tag}.json"
+        with open(todo_dir / task_fn, "w") as fd:
+            LOG.info(f"Creating task {task_fn}")
+            json.dump(task, fd)
 
 
 @cli.command()

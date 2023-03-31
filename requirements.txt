@@ -4,4 +4,6 @@ docker
 dominate
 matplotlib
 numpy
+requests
 rich
+types-requests
