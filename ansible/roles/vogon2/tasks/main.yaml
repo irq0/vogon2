@@ -46,6 +46,7 @@
     - failed
     - done
     - running
+    - seen
 
 - name: create empty database if not exists
   ansible.builtin.shell:
