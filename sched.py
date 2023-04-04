@@ -200,7 +200,7 @@ def cli(ctx, debug):
         path_type=pathlib.Path,
     ),
     required=True,
-    help="Scheduler todo directory",
+    help="Task creator seen file directory",
 )
 def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
     # quay s3gw/s3gw
