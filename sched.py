@@ -2,6 +2,8 @@
 import json
 import logging
 import pathlib
+import platform
+import sqlite3
 import subprocess
 import time
 from datetime import datetime
@@ -213,6 +215,167 @@ def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
         with open(todo_dir / task_fn, "w") as fd:
             LOG.info(f"Creating task {task_fn}")
             json.dump(task, fd)
+
+
+@cli.command()
+@click.pass_context
+@click.option(
+    "--report-dir",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        writable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+    help="Report output directory",
+)
+@click.option(
+    "--sqlite",
+    type=str,
+    required=True,
+    help="Where to find the sqlite database?",
+)
+@click.option(
+    "--config-file",
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+    help="Scheduler sched.json config",
+)
+@click.option(
+    "--attach/--no-attach", default=False, help="Attach report to notification"
+)
+def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
+    dbconn = sqlite3.connect(sqlite)
+    cur = dbconn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+
+    def last_matching_image_tag(match):
+        rows = cur.execute(
+            """
+        SELECT suites.suite_id, value
+        FROM suites
+        INNER JOIN environment
+        ON (suites.suite_id = environment.suite_id)
+        WHERE key = 'under-test-image-tags'
+        AND value GLOB ?
+        AND suites.name = 'warp-mixed-long'
+        ORDER BY finished DESC
+        LIMIT 5;
+        """,
+            (match,),
+        ).fetchall()
+        result = []
+        for k, v in rows:
+            try:
+                v = v.decode("UTF-8")
+            except (UnicodeDecodeError, AttributeError):
+                pass
+            vs = v.split(";")
+            for v in vs:
+                if "latest" in v:
+                    continue
+                tag = v.split(":")[1]
+                result.append((k, tag))
+        return result
+
+    def last_nightlies():
+        # return last_matching_image_tag(r"nightly-\d{4}-\d{2}-\d{2}")
+        return last_matching_image_tag("*nightly-*-*-*")
+
+    def last_releases():
+        # return last_matching_image_tag(r"v\d+\.\d+\.\d+")
+        return last_matching_image_tag(r"*v*.*.*")
+
+    def latest_baseline():
+        return cur.execute(
+            """
+        SELECT suite_id, max(finished)
+        FROM suites
+        WHERE suites.name = 'baseline';
+        """
+        ).fetchone()[0]
+
+    def run_report_gen(config, filename, suite_ids):
+        if "virtualenv" in config.keys():
+            command = [
+                pathlib.Path(config["virtualenv"]) / "bin" / "python3",
+                SCRIPT_PATH / "vogon2.py",
+            ]
+        else:
+            command = [SCRIPT_PATH / "vogon2.py"]
+
+        command.extend(
+            [
+                "report",
+                "--sqlite",
+                sqlite,
+                "fancy",
+                "--out",
+                filename,
+                "--baseline-suite",
+                latest_baseline(),
+            ]
+        )
+
+        command.extend(suite_ids)
+        LOG.info(f"running command {command}")
+        LOG.info(">" * 42)
+        try:
+            subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            LOG.error(f"report generator call failed with {e.returncode}")
+            raise e
+        LOG.info("<" * 42)
+
+    while True:
+        try:
+            with open(config_file) as fd:
+                config = json.load(fd)
+                LOG.debug(f"read config {config_file}: {config}")
+        except json.decoder.JSONDecodeError:
+            LOG.error(f"JSON error in config file {config_file}. retrying load in 10s")
+            time.sleep(10)
+        notify = make_notify(config.get("notify", []))
+
+        for group, bench_runs_fn, count in [
+            ("nightlies", last_nightlies, 5),
+            ("releases", last_releases, 3),
+        ]:
+            benchmark_runs = list(reversed(bench_runs_fn()[:count]))
+            LOG.debug(f"Last {count} runs for {group} group: {benchmark_runs}")
+            report_fn = (
+                report_dir / f"{group}_{'+'.join([x[1] for x in benchmark_runs])}.html"
+            )
+
+            if report_fn.exists():
+                LOG.info(f"{report_fn} already generated. skipping")
+                continue
+
+            LOG.info(
+                f"Generating new report for tags "
+                f"{'+'.join([x[1] for x in benchmark_runs])}: {report_fn}"
+            )
+
+            run_report_gen(config, report_fn, [x[0] for x in benchmark_runs])
+            if attach:
+                notify("🕵", "New report", attach=report_fn)
+            else:
+                notify("🕵", f"New report on {platform.node()} {report_fn}")
+
+        time.sleep(AUTOGEN_SLEEP_TIME_SEC)
 
 
 @cli.command()
