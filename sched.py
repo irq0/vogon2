@@ -375,7 +375,11 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
 
             run_report_gen(config, report_fn, [x[0] for x in benchmark_runs])
             if attach:
-                notify("🕵", "New report", attach=report_fn)
+                notify(
+                    "🕵",
+                    f"New report {', '.join([x[1] for x in benchmark_runs])}",
+                    attach=str(report_fn),
+                )
             else:
                 notify("🕵", f"New report on {platform.node()} {report_fn}")
 
