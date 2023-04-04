@@ -101,10 +101,13 @@ def todo_iter(todo_dir: pathlib.Path, rejected_dir: pathlib.Path):
 
 
 def latest_quay_tags(repo):
-    quay_repo = requests.get(
+    resp = requests.get(
         f"https://quay.io/api/v1/repository/{repo}"
         "/tag/?limit=100&page=1&onlyActiveTags=true"
-    ).json()
+    )
+    resp.raise_for_status()
+    quay_repo = resp.json()
+
     result = [t["name"] for t in quay_repo["tags"]]
     return result
 
