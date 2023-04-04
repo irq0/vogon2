@@ -138,14 +138,14 @@ def make_notify(apprise_urls: list[str]):
         for url in apprise_urls:
             ap.add(url)
 
-        def logplusapprise(title, body):
+        def logplusapprise(title, body, **kwargs):
             LOG.info(f"{title}: {body}")
-            ap.notify(title=title, body=body)
+            ap.notify(title=title, body=body, **kwargs)
 
         return logplusapprise
     else:
 
-        def logonly(title, body):
+        def logonly(title, body, **kwargs):
             LOG.info(f"{title}: {body}")
 
         return logonly
@@ -266,7 +266,7 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
             continue
 
         notify = make_notify(config.get("notify", []))
-        notify(title="🏃", body=str(job))
+        notify("🏃", str(job))
 
         job.move(running)
         try:
@@ -275,14 +275,14 @@ def run(ctx, config_file, sched_dir: pathlib.Path):
             LOG.info(f"moving interrupted job {job} to failed")
             job.move(failed)
         except subprocess.CalledProcessError:
-            notify(title="💣", body=str(job))
+            notify("💣", str(job))
             job.move(failed)
         except Exception as ex:
             LOG.exception(f"💣 {job}", exc_info=True)
-            notify(title="💣", body=f"{job} - {ex}")
+            notify("💣", f"{job} - {ex}")
             job.move(failed)
         else:
-            notify(title="🏁", body=str(job))
+            notify("🏁", str(job))
             job.move(done)
 
 
