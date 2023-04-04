@@ -17,7 +17,7 @@ from rich.logging import RichHandler
 SCRIPT_PATH = pathlib.Path(__file__).parent
 LOG = logging.getLogger("vogon-sched")
 SLEEP_TIME_SEC = 2
-AUTOGEN_SLEEP_TIME_SEC = 600
+AUTOGEN_SLEEP_TIME_SEC = 42 * 60
 
 
 class Job:
