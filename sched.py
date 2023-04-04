@@ -275,6 +275,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         WHERE key = 'under-test-image-tags'
         AND value GLOB ?
         AND suites.name = 'warp-mixed-long'
+        AND suites.finished not null
         ORDER BY finished DESC
         LIMIT 5;
         """,
