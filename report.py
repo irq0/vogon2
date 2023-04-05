@@ -58,20 +58,20 @@ def select_print_table(db, sql, params=()):
     console.print(table)
 
 
-def make_comparison_bargraph_svg(labels, y_1, y_2, y_1_label, y_2_label, ylabel):
-    "Make bar graph with two bars (y_1, y_2) per label"
+def make_comparison_bargraph_svg(labels, ys, ys_label, ylabel):
+    "Make bar graph with bars (y_i, y_i+i, .. in ys) per label"
+    assert len(ys) == len(ys_label)
     xaxis = np.arange(len(labels))
-    bar_width = 0.35
     fig, ax = plt.subplots()
-    b_1 = ax.bar(xaxis - bar_width / 2, y_1, bar_width, label=y_1_label)
-    b_2 = ax.bar(xaxis + bar_width / 2, y_2, bar_width, label=y_2_label)
+    bar_width = 0.35
+
+    for i, y in enumerate(ys):
+        bar = ax.bar(xaxis + i * bar_width, y, bar_width, label=ys_label[i])
+        ax.bar_label(bar, padding=3)
 
     ax.set_ylabel(ylabel)
     ax.set_xticks(xaxis, labels)
     ax.legend()
-
-    ax.bar_label(b_1, padding=3)
-    ax.bar_label(b_2, padding=3)
 
     fig.tight_layout()
 
@@ -423,10 +423,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 continue
             labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
 
-            # note: convert to MB
-            bw_read, bw_write = db.get_normalized_results("bw-mean", rep_ids)
-            bw_read, bw_write = [x / 1024**2 for x in bw_read], [
-                x / 1024**2 for x in bw_write
+            bw = db.get_normalized_results("bw-mean", rep_ids)
+            bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
+                x / 1024**2 for x in bw["write-bw-mean"]
             ]
 
             div = all_div.add(T.div(style="display: flex; flex-wrap: wrap;"))
@@ -435,21 +434,28 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
                     labels,
-                    bw_read,
-                    bw_write,
-                    "read/GET",
-                    "write/PUT",
+                    [bw_read, bw_write],
+                    ["read/GET", "write/PUT"],
                     "Throughput [MB/s]",
                 )
             )
 
             # note: skips baseline, fio iops not comparable with S3 ops
-            ops_read, ops_write = db.get_normalized_results("iops-mean", rep_ids[1:])
+            ops = db.get_normalized_results("iops-mean", rep_ids[1:])
+
+            ops_ordered = [
+                ops["read-iops-mean"],
+                ops["write-iops-mean"],
+                ops["delete-iops-mean"],
+                ops["list-iops-mean"],
+            ]
+            ops_labels = ["GET", "PUT", "DELETE", "LIST"]
+
             fig = div.add(T.figure(style="width: 25rem;"))
             fig.add(T.figcaption("Operations"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
-                    labels[1:], ops_read, ops_write, "GET", "PUT", "Ops [1/s]"
+                    labels[1:], ops_ordered, ops_labels, "Ops [1/s]"
                 )
             )
         return all_div
@@ -516,34 +522,37 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         ),
                     )
                 )
-                stats = op["single_sized_requests"]
-                fig.add_raw_string(
-                    make_percentiles_svg(
-                        stats["dur_percentiles_millis"],
-                        "Request latency [ms]",
-                        op_ymax.get(op["type"], 100),
-                    )
-                )
-                fig.add(
-                    T.figcaption(
-                        T.table(
-                            T.tr(
-                                T.td("op"),
-                                T.td("fastest [ms]"),
-                                T.td("slowest [ms]"),
-                                T.td("avg [ms]"),
-                                T.td("median [ms]"),
-                            ),
-                            T.tr(
-                                T.th(op["type"]),
-                                T.td(stats["fastest_millis"]),
-                                T.td(stats["slowest_millis"]),
-                                T.td(stats["dur_avg_millis"]),
-                                T.td(stats["dur_median_millis"]),
-                            ),
+                if "single_sized_requests" in op:
+                    stats = op["single_sized_requests"]
+                    fig.add_raw_string(
+                        make_percentiles_svg(
+                            stats["dur_percentiles_millis"],
+                            "Request latency [ms]",
+                            op_ymax.get(op["type"], 100),
                         )
                     )
-                )
+                    fig.add(
+                        T.figcaption(
+                            T.table(
+                                T.tr(
+                                    T.td("op"),
+                                    T.td("fastest [ms]"),
+                                    T.td("slowest [ms]"),
+                                    T.td("avg [ms]"),
+                                    T.td("median [ms]"),
+                                ),
+                                T.tr(
+                                    T.th(op["type"]),
+                                    T.td(stats["fastest_millis"]),
+                                    T.td(stats["slowest_millis"]),
+                                    T.td(stats["dur_avg_millis"]),
+                                    T.td(stats["dur_median_millis"]),
+                                ),
+                            )
+                        )
+                    )
+                else:
+                    fig.add(T.figcaption("No data"))
         return all_div
 
     # Tabulate latency graphs by testname sections with row per suite
