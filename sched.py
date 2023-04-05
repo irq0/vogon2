@@ -276,7 +276,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
     cur = dbconn.cursor()
     cur.execute("PRAGMA foreign_keys = ON;")
 
-    def last_matching_image_tag(match):
+    def last_matching_image_tag(image_match, suites_match):
         rows = cur.execute(
             """
         SELECT suites.suite_id, value
@@ -285,12 +285,12 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         ON (suites.suite_id = environment.suite_id)
         WHERE key = 'under-test-image-tags'
         AND value GLOB ?
-        AND suites.name = 'warp-mixed-long'
+        AND suites.name = ?
         AND suites.finished not null
         ORDER BY finished DESC
         LIMIT 5;
         """,
-            (match,),
+            (image_match, suites_match),
         ).fetchall()
         result = []
         for k, v in rows:
@@ -306,13 +306,14 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
                 result.append((k, tag))
         return result
 
-    def last_nightlies():
-        # return last_matching_image_tag(r"nightly-\d{4}-\d{2}-\d{2}")
-        return last_matching_image_tag("*nightly-*-*-*")
+    def last_mixed_nightlies():
+        return last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long")
 
-    def last_releases():
-        # return last_matching_image_tag(r"v\d+\.\d+\.\d+")
-        return last_matching_image_tag(r"*v*.*.*")
+    def last_mixed_releases():
+        return last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
+
+    def last_single_op_releases():
+        return last_matching_image_tag(r"*v*.*.*", "warp-single-op")
 
     def latest_baseline():
         return cur.execute(
@@ -366,8 +367,9 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         notify = make_notify(config.get("notify", []))
 
         for group, bench_runs_fn, count in [
-            ("nightlies", last_nightlies, 5),
-            ("releases", last_releases, 3),
+            ("nightlies", last_mixed_nightlies, 5),
+            ("releases", last_mixed_releases, 3),
+            ("release_comprehensive", last_single_op_releases, 2),
         ]:
             benchmark_runs = list(reversed(bench_runs_fn()[:count]))
             LOG.debug(f"Last {count} runs for {group} group: {benchmark_runs}")
