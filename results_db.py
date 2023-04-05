@@ -255,33 +255,34 @@ class ResultsDB:
 
     def get_normalized_results(
         self, key_suffix: str, rep_ids: list[str]
-    ) -> tuple[list[float], list[float]]:
+    ) -> dict[str, list[float]]:
         """
         Get results for rep_ids normalized to key_suffix for read and write operations.
         Output one list per operation. Each entry a result for a single rep
         """
 
-        read = []
-        write = []
+        keys = [f"{op}-{key_suffix}" for op in ("read", "write", "delete", "list")]
+        result: dict[str, list[float]] = {k: [] for k in keys}
 
         with closing(self.db.cursor()) as cur:
             for rep in rep_ids:
-                data = cur.execute(
+                rows = cur.execute(
                     f"""
-                    SELECT value
+                    SELECT key, value
                     FROM results
                     WHERE rep_id = ?
-                      AND key IN ('read-{key_suffix}', 'write-{key_suffix}',
-                                  'delete-{key_suffix}', 'list-{key_suffix}')
+                      AND key IN ({",".join((f"'{k}'" for k in keys))})
                     """,
                     (rep,),
                 ).fetchall()
-                if not data:
-                    raise Exception(f"no data: {cur} {data} {rep}")
-                read.append(float(data[0][0]))
-                write.append(float(data[1][0]))
+                if not rows:
+                    raise Exception(f"no data: {cur} {rows} {rep}")
+                row_kvs = {k: float(v) for k, v in rows}
 
-        return (read, write)
+                for k in result:
+                    result[k].append(row_kvs.get(k, 0))
+
+        return result
 
     def get_testrun_details(self, suite_id: IDType) -> dict[str, str]:
         "Return testrun details (names, selected environment data) as key value dict"
