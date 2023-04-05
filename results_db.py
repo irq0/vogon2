@@ -271,7 +271,8 @@ class ResultsDB:
                     SELECT value
                     FROM results
                     WHERE rep_id = ?
-                      AND key IN ('read-{key_suffix}', 'write-{key_suffix}')
+                      AND key IN ('read-{key_suffix}', 'write-{key_suffix}',
+                                  'delete-{key_suffix}', 'list-{key_suffix}')
                     """,
                     (rep,),
                 ).fetchall()
