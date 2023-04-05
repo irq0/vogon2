@@ -1164,6 +1164,58 @@ def init_db(sqlite):
     cur.close()
 
 
+@cli.command()
+@click.option(
+    "--sqlite",
+    type=str,
+    required=True,
+    help="Where to find the sqlite database?",
+)
+def normalize_result_from_json(sqlite):
+    db = results_db.ResultsDB(sqlite3.connect(sqlite))
+    cur = db.db.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+
+    for test_class in [WarpTest]:
+        rep_ids = cur.execute(
+            """
+            SELECT rep_id
+            FROM tests
+            INNER JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
+            WHERE kind = ?
+            """,
+            (test_class.kind(),),
+        ).fetchall()
+
+        for rep_id_tuple in rep_ids:
+            rep_id = rep_id_tuple[0]
+            row = cur.execute(
+                """
+                    SELECT value
+                    FROM results
+                    WHERE rep_id = ?
+                    AND unit = 'JSON' AND key = 'JSON'
+                    """,
+                (rep_id,),
+            ).fetchone()
+
+            if not row:
+                continue
+
+            jresult = json.loads(row[0])
+            normalized = test_class.normalized_results(jresult)
+            res = cur.executemany(
+                """
+                INSERT INTO results (rep_id, key, value, unit)
+                VALUES (?, ?, ?, ?)
+                """,
+                ((rep_id, k, v, u) for k, v, u in normalized),
+            )
+            print(f"REP ID {rep_id}: {res.rowcount} rows updated")
+            db.db.commit()
+    cur.close()
+
+
 if __name__ == "__main__":
     cli.add_command(report.report)
     cli(obj={})
