@@ -404,7 +404,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     baseline_tests = db.get_test_runs(baseline_suite)
     suite_tests = [db.get_test_runs(suite_id) for suite_id in suite_ids]
 
-    all_test_names = {name for test in suite_tests for name in test.keys()}
+    all_test_names = list({name for test in suite_tests for name in test.keys()})
+    all_test_names.sort()
 
     # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
     def bar_graphs():
