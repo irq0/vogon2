@@ -63,7 +63,7 @@ def make_comparison_bargraph_svg(labels, ys, ys_label, ylabel):
     assert len(ys) == len(ys_label)
     xaxis = np.arange(len(labels))
     fig, ax = plt.subplots()
-    bar_width = 0.35
+    bar_width = 1 / len(ys) - 0.02
 
     for i, y in enumerate(ys):
         bar = ax.bar(xaxis + i * bar_width, y, bar_width, label=ys_label[i])
