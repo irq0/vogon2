@@ -374,6 +374,8 @@ class WarpTest(ContainerizedTest):
     s3_op_to_fio_op = {
         "GET": "read",
         "PUT": "write",
+        "DELETE": "delete",
+        "LIST": "list",
     }
 
     def __init__(self, name: str, workload: str, args: list[str] = []):
@@ -486,13 +488,17 @@ class WarpTest(ContainerizedTest):
             return None
 
         results.append(("JSON", self.raw_results, "JSON"))
+        results.extend(self.normalized_results(self.json_results))
+        return results
 
-        # normalize keys to FIOTest
-        for op in self.json_results.get("operations", []):
+    @classmethod
+    def normalized_results(cls, json_results):
+        results = []
+        for op in json_results.get("operations", []):
             if op["skipped"]:
                 continue
             try:
-                type_fio = self.s3_op_to_fio_op[op["type"]]
+                type_fio = cls.s3_op_to_fio_op[op["type"]]
             except KeyError:
                 continue
             results.append(
@@ -501,7 +507,6 @@ class WarpTest(ContainerizedTest):
             results.append(
                 (f"{type_fio}-iops-mean", op["throughput"]["average_ops"], "iops")
             )
-
         return results
 
     def env(self, instance: "TestRunner"):
@@ -510,7 +515,8 @@ class WarpTest(ContainerizedTest):
         env[self.name + "-args"] = " ".join(self.args)
         return env
 
-    def kind(self) -> str:
+    @classmethod
+    def kind(cls) -> str:
         return "WARP"
 
     def __str__(self) -> str:
