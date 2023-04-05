@@ -370,7 +370,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         for group, bench_runs_fn, count in [
             ("nightlies", last_mixed_nightlies, 5),
             ("releases", last_mixed_releases, 3),
-            ("release_comprehensive", last_single_op_releases, 2),
+            ("release_comprehensive", last_single_op_releases, 1),
         ]:
             benchmark_runs = list(reversed(bench_runs_fn()[:count]))
             LOG.debug(f"Last {count} runs for {group} group: {benchmark_runs}")
