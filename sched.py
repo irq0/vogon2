@@ -353,8 +353,9 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
             LOG.error(f"report generator call failed with {e.returncode}")
-            raise e
+            return False
         LOG.info("<" * 42)
+        return True
 
     while True:
         try:
@@ -386,7 +387,14 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
                 f"{'+'.join([x[1] for x in benchmark_runs])}: {report_fn}"
             )
 
-            run_report_gen(config, report_fn, [x[0] for x in benchmark_runs])
+            ret = run_report_gen(config, report_fn, [x[0] for x in benchmark_runs])
+            if not ret:
+                notify(
+                    "🤮",
+                    f"Report generator failed on {platform.node()} "
+                    f"generating {report_fn}",
+                )
+                continue
             if attach:
                 notify(
                     "🕵",
