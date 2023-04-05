@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import platform
+import re
 import sqlite3
 import subprocess
 import time
@@ -170,6 +171,18 @@ def cli(ctx, debug):
     )
 
 
+def create_task(image, tag, suite, todo_dir):
+    task = {
+        "under_test_image": image,
+        "under_test_image_pull": "true",
+        "suite": suite,
+    }
+    task_fn = f"auto_{suite}_{tag}.json"
+    with open(todo_dir / task_fn, "w") as fd:
+        LOG.info(f"Creating task {task_fn}")
+        json.dump(task, fd)
+
+
 @cli.command()
 @click.pass_context
 @click.option(
@@ -209,15 +222,13 @@ def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
         lambda: latest_quay_tags(repo), seen_dir / "s3gw_s3gw"
     ):
         image = f"quay.io/{repo}:{tag}"
-        task = {
-            "under_test_image": image,
-            "under_test_image_pull": "true",
-            "suite": "warp-mixed-long",
-        }
-        task_fn = f"auto_warp-mixed-long_{tag}.json"
-        with open(todo_dir / task_fn, "w") as fd:
-            LOG.info(f"Creating task {task_fn}")
-            json.dump(task, fd)
+
+        # run on every tag
+        create_task(image, tag, "warp-mixed-long", todo_dir)
+
+        # run the comprehensive suite only on releases
+        if re.match(r"v\d+\.\d+\.\d+$", tag):
+            create_task(image, tag, "warp-single-op", todo_dir)
 
 
 @cli.command()
