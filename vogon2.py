@@ -725,6 +725,7 @@ test_suites = [
         "warp-single-op",
         "Warp: Single Operation Benchmarks",
         tests=[
+            # PUT
             WarpTest(
                 "put-c20-uniform32M-nomulti",
                 "put",
@@ -778,6 +779,7 @@ test_suites = [
                     "--obj.randsize=false",
                 ],
             ),
+            # GET
             WarpTest(
                 "get-c20-uniform32M",
                 "get",
@@ -848,6 +850,7 @@ test_suites = [
                     "--objects=2048",
                 ],
             ),
+            # LIST
             WarpTest(
                 "list-c20-1k",
                 "list",
@@ -868,6 +871,17 @@ test_suites = [
                     "--obj.size=256",
                     "--obj.randsize=false",
                     "--objects=10000",
+                ],
+            ),
+            WarpTest(
+                "list-c20-100k",
+                "list",
+                [
+                    "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--obj.randsize=false",
+                    "--objects=100000",
                 ],
             ),
             WarpTest(
@@ -893,10 +907,22 @@ test_suites = [
                 ],
             ),
             WarpTest(
-                "list--c20-100k",
+                "list-c1-100k",
                 "list",
                 [
-                    "--concurrent=20",
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--obj.randsize=false",
+                    "--objects=100000",
+                ],
+            ),
+            # DELETE
+            WarpTest(
+                "delete-c1-100k-small",
+                "delete",
+                [
+                    "--concurrent=1",
                     "--duration=10m",
                     "--obj.size=256",
                     "--obj.randsize=false",
