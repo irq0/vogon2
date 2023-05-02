@@ -310,7 +310,11 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         return last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long")
 
     def last_mixed_releases():
-        return last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
+        return [
+            release
+            for release in last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
+            if "-rc" not in release
+        ]
 
     def last_single_op_releases():
         return last_matching_image_tag(r"*v*.*.*", "warp-single-op")
