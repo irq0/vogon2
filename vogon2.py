@@ -978,7 +978,7 @@ test_suites = [
                     "--stat-distrib=30",
                     "--put-distrib=15",
                     "--delete-distrib=10",
-                    "--objects=30000",
+                    "--objects=20000",
                     "--obj.size=10MiB",
                 ],
             ),
