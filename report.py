@@ -422,6 +422,10 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             except KeyError:
                 all_div.add(T.p("At least one test suite does not have this test :("))
                 continue
+            if any(not t[test_name]["success"] for t in suite_tests):
+                all_div.add(T.p("At least one test suite failed this test :("))
+                continue
+
             labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
 
             bw = db.get_normalized_results("bw-mean", rep_ids)
@@ -566,12 +570,21 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             for suite, tests in zip(suites, suite_tests):
                 for test_name, test in tests.items():
                     if row_test_name == test_name:
-                        table.add(
-                            T.tr(
-                                T.th(f"{suite['suite_id']:9.9}"),
-                                T.td(warp_latency_graph(max(test["reps"]))),
+                        if test["success"]:
+                            table.add(
+                                T.tr(
+                                    T.th(f"{suite['suite_id']:9.9}"),
+                                    T.td(warp_latency_graph(max(test["reps"]))),
+                                )
                             )
-                        )
+                        else:
+                            table.add(
+                                T.tr(
+                                    T.th(f"{suite['suite_id']:9.9}"),
+                                    T.td("failed"),
+                                )
+                            )
+
         return div
 
     # Test environment data
