@@ -533,7 +533,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         make_percentiles_svg(
                             stats["dur_percentiles_millis"],
                             "Request latency [ms]",
-                            op_ymax.get(op["type"], 100),
+                            op_ymax.get(op["type"], 1000),
                         )
                     )
                     fig.add(
