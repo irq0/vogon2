@@ -361,7 +361,7 @@ class FIOTest(HostTest):
 
 
 class WarpTest(ContainerizedTest):
-    default_container_image = "minio/warp:v0.7.0"
+    default_container_image = "minio/warp"
     default_args = ["--no-color"]
     default_workload_args = [
         "--host=localhost:7480",
