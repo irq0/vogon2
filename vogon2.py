@@ -42,9 +42,7 @@ class ContainerManager:
         """wrap docker client run(). runs detached and set
         self.container to the started container. forward args"""
 
-        self.container = self.cri.containers.run(
-            self.image.id, detach=True, labels=["vogon"], **kwargs
-        )
+        self.container = self.cri.containers.run(self.image.id, detach=True, **kwargs)
         LOG.debug("Started container for image %s: %s", self.image, self.container.name)
         return self.container
 
