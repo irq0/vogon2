@@ -255,8 +255,8 @@ def show(ctx, suite_id):
     table.add_column("Test ID")
     table.add_column("Repetition IDs")
 
-    for test_id, test in db.get_test_runs(suite_id).items():
-        table.add_row(test["name"], test_id, ", ".join(test["reps"]))
+    for test in db.get_test_runs(suite_id).values():
+        table.add_row(test["name"], test["test_id"], ", ".join(test["reps"]))
 
     console.print(table)
 
