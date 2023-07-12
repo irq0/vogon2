@@ -310,6 +310,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         return sorted(
             last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long"),
             key=itemgetter(1),
+            reverse=True,
         )
 
     def last_mixed_releases():
@@ -320,6 +321,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
                 if "-rc" not in release[1]
             ],
             key=itemgetter(1),
+            reverse=True,
         )
 
     def last_single_op_releases():
@@ -330,7 +332,11 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
                 if "-rc" not in release[1]
             ],
             key=itemgetter(1),
+            reverse=True,
         )
+
+    def last_mixed_release_and_nightlies():
+        return [last_mixed_releases()[0]] + last_mixed_nightlies()
 
     def latest_baseline():
         return cur.execute(
@@ -385,7 +391,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         notify = make_notify(config.get("notify", []))
 
         for group, bench_runs_fn, count in [
-            ("nightlies", last_mixed_nightlies, 5),
+            ("nightlies", last_mixed_release_and_nightlies, 5),
             ("releases", last_mixed_releases, 3),
             ("release_comprehensive", last_single_op_releases, 1),
         ]:
