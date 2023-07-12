@@ -9,6 +9,7 @@ import subprocess
 import time
 import contextlib
 from datetime import datetime
+from operator import itemgetter
 
 import apprise
 import click
@@ -306,21 +307,30 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         return result
 
     def last_mixed_nightlies():
-        return last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long")
+        return sorted(
+            last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long"),
+            key=itemgetter(1),
+        )
 
     def last_mixed_releases():
-        return [
-            release
-            for release in last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
-            if "-rc" not in release[1]
-        ]
+        return sorted(
+            [
+                release
+                for release in last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
+                if "-rc" not in release[1]
+            ],
+            key=itemgetter(1),
+        )
 
     def last_single_op_releases():
-        return [
-            release
-            for release in last_matching_image_tag(r"*v*.*.*", "warp-single-op")
-            if "-rc" not in release[1]
-        ]
+        return sorted(
+            [
+                release
+                for release in last_matching_image_tag(r"*v*.*.*", "warp-single-op")
+                if "-rc" not in release[1]
+            ],
+            key=itemgetter(1),
+        )
 
     def latest_baseline():
         return cur.execute(
