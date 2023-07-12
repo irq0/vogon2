@@ -392,6 +392,7 @@ class WarpTest(ContainerizedTest):
         "PUT": "write",
         "DELETE": "delete",
         "LIST": "list",
+        "STAT": "stat",
     }
 
     def __init__(self, name: str, workload: str, args: list[str] | None = None):
