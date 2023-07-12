@@ -458,6 +458,25 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     all_test_names = list({name for test in suite_tests for name in test.keys()})
     all_test_names.sort()
 
+    def fail_table():
+        failed_tests = [
+            t[test_name]
+            for t in suite_tests
+            for test_name in all_test_names
+            if not t[test_name]["success"]
+        ]
+        div = T.div()
+        if failed_tests:
+            table = div.add(T.table())
+            tbody = table.add(T.body())
+            for test in failed_tests:
+                with tbody.add(T.tr()):
+                    T.td(str(test["name"]))
+                    # TODO add why?
+        else:
+            div.add(T.p("All good"))
+        return div
+
     # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
     def bar_graphs():
         all_div = T.div()
@@ -677,7 +696,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     with doc.head:
         T.meta(http_equiv="Content-Type", content="text/html; charset=utf-8")
     with doc:
-        T.div(T.h1("PR Performance Report"), bar_graphs())
+        T.div(T.h1("S3GW Performance Report"), bar_graphs())
+
+        T.div(T.h2("Test Failures"), fail_table())
 
         T.div(
             T.h2("Comparison Tables"),
