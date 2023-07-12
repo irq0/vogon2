@@ -310,7 +310,7 @@ def containers(ctx, docker_api, suite_id):
         for c in all_containers.values()
         if any("vogon" in label for label in c.labels)
     ]
-    console.print(", ".join(related_rest or ("none",)))
+    console.print(", ".join([c.name for c in related_rest] or ("none",)))
 
 
 @report.command()
