@@ -171,13 +171,14 @@ class Storage:
                 f"💾 resetting storage: mountpoint {self.mountpoint}, "
                 f"dev {self.partition}, command {self.mkfs_command}"
             )
-            for retry_count in range(1, 10):
+            for retry_count in range(1, 23):
                 try:
                     umount_out = subprocess.check_output(
                         ["sudo", "umount", str(self.mountpoint.absolute())],
                         stderr=subprocess.STDOUT,
                     )
                     LOG.debug("umount: %s", umount_out)
+                    break
                 except subprocess.CalledProcessError as e:
                     if b"apparently in use by the system" in e.output:
                         LOG.debug(f"umount: {e.output}")
@@ -193,13 +194,14 @@ class Storage:
                     break
 
             time.sleep(1)
-            for retry_count in range(1, 10):
+            for retry_count in range(1, 23):
                 try:
                     mkfs_out = subprocess.check_output(
                         self.mkfs_command + [str(self.partition)],
                         stderr=subprocess.STDOUT,
                     )
                     LOG.debug("mkfs out: %s", mkfs_out)
+                    break
                 except subprocess.CalledProcessError as e:
                     if b"apparently in use by the system" in e.output:
                         LOG.debug(f"mkfs: {e.output}")
