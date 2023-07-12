@@ -23,7 +23,7 @@ DockerImageType = str
 
 
 class ContainerManager:
-    """Wraps container runtime interface API to simplifiy
+    """Wraps container runtime interface API to simplify
     run, terminate, retrieve logs and test environment data
     """
 
@@ -180,7 +180,7 @@ class Storage:
                 except subprocess.CalledProcessError as e:
                     if b"apparently in use by the system" in e.output:
                         LOG.debug(f"umount: {e.output}")
-                        LOG.waring(
+                        LOG.warning(
                             f"umount: still in use. retrying umount in a bit. "
                             f"retry {retry_count}"
                         )
@@ -378,10 +378,13 @@ class WarpTest(ContainerizedTest):
         "LIST": "list",
     }
 
-    def __init__(self, name: str, workload: str, args: list[str] = []):
+    def __init__(self, name: str, workload: str, args: list[str] | None = None):
         super().__init__(name, self.default_container_image)
         self.workload = workload
-        self.args = args
+        if args is None:
+            self.args = []
+        else:
+            self.args = args
         self.raw_results: str = ""
         self.warp_version: str = "unknown"
         self.json_results: dict = {}
@@ -436,10 +439,10 @@ class WarpTest(ContainerizedTest):
         self.last_run_image = self.last_run.commit(
             f"localhost/{self.default_container_image}", f"test_rep_{instance.rep_id}"
         )
-        LOG.info("🔎 Commited warp run container to %s", self.last_run_image)
+        LOG.info("🔎 Committed warp run container to %s", self.last_run_image)
 
         # this looks like a lot of work and it is. unfortunately using
-        # the logger was not reliable enaugh for large json
+        # the logger was not reliable enough for large JSON
         container = instance.cri.containers.run(
             self.last_run_image,
             detach=True,
@@ -1108,7 +1111,7 @@ def cli(ctx, debug):
     type=str,
     envvar="VOGON_MKFS",
     required=True,
-    help="mkfs command. splitted by .split(). append device on call",
+    help="mkfs command. split by .split(). append device on call",
 )
 @click.option(
     "--docker-api",

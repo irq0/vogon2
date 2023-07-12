@@ -7,6 +7,7 @@ import re
 import sqlite3
 import subprocess
 import time
+import contextlib
 from datetime import datetime
 
 import apprise
@@ -46,7 +47,7 @@ class Job:
         with open(job_file) as fd:
             job = json.load(fd)
 
-        if not all(key in job.keys() for key in self.required_keys):
+        if not all(key in job for key in self.required_keys):
             raise Exception(
                 "not all required keys present: "
                 f"keys={job.keys()} required={self.required_keys}"
@@ -68,7 +69,7 @@ class Job:
 
     def run(self, config):
         env = config["environment"] | self.environment
-        if "virtualenv" in config.keys():
+        if "virtualenv" in config:
             command = [
                 pathlib.Path(config["virtualenv"]) / "bin" / "python3",
                 SCRIPT_PATH / "vogon2.py",
@@ -294,10 +295,8 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         ).fetchall()
         result = []
         for k, v in rows:
-            try:
+            with contextlib.suppress(UnicodeDecodeError, AttributeError):
                 v = v.decode("UTF-8")
-            except (UnicodeDecodeError, AttributeError):
-                pass
             vs = v.split(";")
             for v in vs:
                 if "latest" in v:
@@ -329,7 +328,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         ).fetchone()[0]
 
     def run_report_gen(config, filename, suite_ids):
-        if "virtualenv" in config.keys():
+        if "virtualenv" in config:
             command = [
                 pathlib.Path(config["virtualenv"]) / "bin" / "python3",
                 SCRIPT_PATH / "vogon2.py",

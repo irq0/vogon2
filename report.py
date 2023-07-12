@@ -6,6 +6,7 @@ import json
 import logging
 import pathlib
 import sqlite3
+import contextlib
 from contextlib import closing
 
 import click
@@ -28,11 +29,11 @@ def format_bytes(b):
     if b < 1024:
         return f"{b:1.2f}"
 
-    for i, suffix in enumerate(("K", "M", "G"), 2):
+    for i, _suffix in enumerate(("K", "M", "G"), 2):
         unit = 1024**i
         if b < unit:
             break
-    return f"{(1024 * b / unit):1.2f}{suffix}"
+    return f"{(1024 * b / unit):1.2f}{_suffix}"
 
 
 def format_value(value, unit):
@@ -219,7 +220,7 @@ def testruns(ctx):
 @click.pass_context
 @click.argument("suite-id", type=str)
 def environ(ctx, suite_id):
-    "Test enviromnent data"
+    "Test environment data"
     select_print_table(
         ctx.obj["db"].db,
         """
@@ -330,10 +331,8 @@ def result(ctx, rep_id, key):
             (rep_id,),
         ).fetchall()
         for k, v, u in rows:
-            try:
+            with contextlib.suppress(UnicodeDecodeError, AttributeError):
                 v = v.decode("utf-8")
-            except (UnicodeDecodeError, AttributeError):
-                pass
             if len(v) > 42:
                 v = f"[italic]Skipping {len(v)} byte value[/italic]"
             table.add_row(k, u, format_value(v, u))
@@ -612,10 +611,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             with tbody.add(T.tr()):
                 T.th(str(k))
                 for v in vs:
-                    try:
+                    with contextlib.suppress(UnicodeDecodeError, AttributeError):
                         v = v.decode("utf-8")
-                    except (UnicodeDecodeError, AttributeError):
-                        pass
                     if k == "suite_id":
                         T.td(T.strong(v[:9]), v[9:])
                     else:
@@ -623,14 +620,14 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         return div
 
     # Assemble report
-    doc = dominate.document(title="PR Performance Report", lang="en")
+    doc = dominate.document(title="S3GW Performance Report", lang="en")
     with doc.head:
         T.meta(http_equiv="Content-Type", content="text/html; charset=utf-8")
     with doc:
         T.div(T.h1("PR Performance Report"), bar_graphs())
 
         T.div(
-            T.h2("Comparision Tables"),
+            T.h2("Comparison Tables"),
             T.p("> 1 faster, = 1 no change, < 1 slower, > 1.3x 😎"),
             (comparision_table(a, b) for a, b in itertools.combinations(suites, 2)),
         )
