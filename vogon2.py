@@ -187,7 +187,7 @@ class Storage:
                             f"umount: still in use. retrying umount in a bit. "
                             f"retry {retry_count}"
                         )
-                        time.sleep(1)
+                        time.sleep(1 * retry_count)
                         continue
                     # on first run mountpoint is typically not mounted
                     if b"not mounted" not in e.output:
@@ -195,10 +195,23 @@ class Storage:
                     break
 
             time.sleep(1)
-            mkfs_out = subprocess.check_output(
-                self.mkfs_command + [str(self.partition)], stderr=subprocess.STDOUT
-            )
-            LOG.debug("mkfs out: %s", mkfs_out)
+            for retry_count in range(1, 10):
+                try:
+                    mkfs_out = subprocess.check_output(
+                        self.mkfs_command + [str(self.partition)],
+                        stderr=subprocess.STDOUT,
+                    )
+                    LOG.debug("mkfs out: %s", mkfs_out)
+                except subprocess.CalledProcessError as e:
+                    if b"apparently in use by the system" in e.output:
+                        LOG.debug(f"mkfs: {e.output}")
+                        LOG.warning(
+                            f"mkfs: still in use. retrying mkfs in a bit. "
+                            f"retry {retry_count}"
+                        )
+                        time.sleep(1 * retry_count)
+                        continue
+                    break
 
             mount_out = subprocess.check_output(
                 ["sudo", "mount", str(self.partition), str(self.mountpoint.absolute())],
