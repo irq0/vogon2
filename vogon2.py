@@ -42,7 +42,9 @@ class ContainerManager:
         """wrap docker client run(). runs detached and set
         self.container to the started container. forward args"""
 
-        self.container = self.cri.containers.run(self.image.id, detach=True, **kwargs)
+        self.container = self.cri.containers.run(
+            self.image.id, detach=True, labels=["vogon"], **kwargs
+        )
         LOG.debug("Started container for image %s: %s", self.image, self.container.name)
         return self.container
 
@@ -85,6 +87,7 @@ class S3GW(ContainerManager):
             detach=True,
             **args,
             network_mode="host",
+            labels=["vogon_s3gw"],
             volumes={
                 self.storage.mountpoint: {
                     "bind": "/data",
@@ -402,7 +405,10 @@ class WarpTest(ContainerizedTest):
         args = self.make_args()
         LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
-            command=args, network_mode="host", name=f"warp_{instance.rep_id}"
+            command=args,
+            network_mode="host",
+            labels=["vogon_warp"],
+            name=f"warp_{instance.rep_id}",
         )
         LOG.info("🔎 Warp container: %s", running.name)
 
@@ -447,6 +453,8 @@ class WarpTest(ContainerizedTest):
             self.last_run_image,
             detach=True,
             entrypoint="/bin/sh",
+            labels=["vogon_warp_results"],
+            name=f"warp_results_{instance.rep_id}",
             command=["-c", "/warp analyze --json /warp.out.csv.zst > /warp.json"],
         )
         LOG.info("🔨 extracting warp results. container: %s", container)
