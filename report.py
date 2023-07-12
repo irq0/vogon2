@@ -287,6 +287,7 @@ def containers(ctx, docker_api, suite_id):
 
     table = Table(box=rich.box.SIMPLE, title="Containers during test reps")
     table.add_column("Test", style="red")
+    table.add_column("Success")
     table.add_column("Rep")
     table.add_column("Containers", no_wrap=True)
     for test in db.get_test_runs(suite_id).values():
@@ -297,6 +298,7 @@ def containers(ctx, docker_api, suite_id):
 
             table.add_row(
                 [test["name"], ""][int(i > 0)],
+                ["😫", "✅"][int(test["success"])],
                 rep,
                 ", ".join(c.name for c in rep_containers),
             )
@@ -308,7 +310,7 @@ def containers(ctx, docker_api, suite_id):
         for c in all_containers.values()
         if any("vogon" in label for label in c.labels)
     ]
-    console.print(", ".join(related_rest))
+    console.print(", ".join(related_rest or ("none",)))
 
 
 @report.command()
