@@ -9,6 +9,7 @@ import sqlite3
 import contextlib
 from contextlib import closing
 
+import docker
 import click
 import dominate
 import dominate.tags as T
@@ -259,6 +260,49 @@ def show(ctx, suite_id):
         table.add_row(test["name"], test["test_id"], ", ".join(test["reps"]))
 
     console.print(table)
+
+
+@report.command()
+@click.option(
+    "--docker-api",
+    type=str,
+    envvar="VOGON_DOCKER_API",
+    default="unix://var/run/docker.sock",
+    help="Docker API URI. e.g unix://run/podman/podman.sock",
+)
+@click.argument("suite-id", type=str)
+@click.pass_context
+def containers(ctx, docker_api, suite_id):
+    "List local containers available still available that ran during test"
+    cri = docker.DockerClient(base_url=docker_api)
+    db = ctx.obj["db"]
+    console = Console()
+    all_containers = {c.name: c for c in cri.containers.list(all=True)}
+
+    table = Table(box=rich.box.SIMPLE, title="Containers during test reps")
+    table.add_column("Test", style="red")
+    table.add_column("Rep")
+    table.add_column("Containers", no_wrap=True)
+    for test in db.get_test_runs(suite_id).values():
+        for i, rep in enumerate(test["reps"]):
+            rep_containers = [c for name, c in all_containers.items() if rep in name]
+            for c in rep_containers:
+                del all_containers[c.name]
+
+            table.add_row(
+                [test["name"], ""][int(i > 0)],
+                rep,
+                ", ".join(c.name for c in rep_containers),
+            )
+
+    console.print(table)
+    console.print("Other related containers:")
+    related_rest = [
+        c
+        for c in all_containers.values()
+        if any("vogon" in label for label in c.labels)
+    ]
+    console.print(", ".join(related_rest))
 
 
 @report.command()
