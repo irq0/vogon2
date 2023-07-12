@@ -326,7 +326,7 @@ def results(ctx, suite_id):
         show_header=True,
         box=rich.box.SIMPLE,
         highlight=True,
-        caption=f"Combined test results for test suite run {suite_id}",
+        title=f"Combined test results for test suite run {suite_id}",
     )
     for col in cols.keys():
         if isinstance(col, tuple):
@@ -404,7 +404,7 @@ def compare(ctx, suite_a, suite_b):
         show_header=True,
         box=rich.box.SIMPLE,
         highlight=True,
-        caption=f"Test result comparison. {suite_a} ￫ {suite_b}",
+        title=f"Test result comparison. {suite_a} ￫ {suite_b}",
     )
 
     def add_headline(headlines):
