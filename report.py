@@ -498,7 +498,14 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
             labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
 
-            bw = db.get_normalized_results("bw-mean", rep_ids)
+            try:
+                bw = db.get_normalized_results("bw-mean", rep_ids)
+            except Exception:
+                all_div.add(
+                    T.p("At least one test suite doesn't have normalized results :(")
+                )
+                continue
+
             bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
                 x / 1024**2 for x in bw["write-bw-mean"]
             ]
@@ -583,7 +590,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     (rep_id,),
                 ).fetchone()[0]
             )
-            if not data:
+            if not data or "operations" not in data:
                 all_div.add(T.p(f"No JSON results found for {rep_id}"))
                 return all_div
             for op in data["operations"]:
