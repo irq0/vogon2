@@ -686,12 +686,7 @@ class TestRunner:
         self.db.save_after_test(self.test_id)
         self.db.save_test_environment(self.suite_id, test.env(self), "test-")
 
-    def run_test_rep(self, test: Test):
-        self.rep_id = results_db.make_id()
-        self.db.save_before_rep(self.test_id, self.rep_id)
-        self.storage.reset()
-
-        LOG.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
+    def under_test_start(self, test: Test):
         self.under_test_container.run(name=f"under_test_{self.rep_id}")
         self.save_under_test_container_env_once()
 
@@ -713,6 +708,29 @@ class TestRunner:
             retry,
         )
 
+    def under_test_stop(self, test: Test):
+        self.under_test_container.terminate()
+        LOG.info(
+            "🛜  Waiting for endpoint to disappear %s",
+            self.under_test_container.endpoint(),
+        )
+        for retry in range(23):
+            if not self.under_test_container.up():
+                break
+            time.sleep(1 * retry)
+        if self.under_test_container.up():
+            LOG.warning(
+                "🛜  Endpoint %s still up after %s retries?!",
+                self.under_test_container.endpoint(),
+                retry,
+            )
+
+    def run_test_rep(self, test: Test):
+        self.rep_id = results_db.make_id()
+        self.db.save_before_rep(self.test_id, self.rep_id)
+        self.storage.reset()
+        LOG.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
+        self.under_test_start(test)
         self.storage.drop_caches()
         try:
             returncode = test.run(self)
@@ -724,8 +742,8 @@ class TestRunner:
                 e,
                 exc_info=True,
             )
-
             self.db.save_after_rep(self.rep_id, -10, f"failed with exception: {str(e)}")
+            self.under_test_stop(test)
             raise e
 
         if returncode != 0:
@@ -738,6 +756,7 @@ class TestRunner:
             self.db.save_after_rep(
                 self.rep_id, returncode, "failed with non-zero return code"
             )
+            self.under_test_stop(test)
             raise AbortTest
 
         try:
@@ -753,27 +772,12 @@ class TestRunner:
             self.db.save_after_rep(
                 self.rep_id, -20, f"result parser returned exception: {str(e)}"
             )
+            self.under_test_stop(test)
             raise e
 
         self.db.save_after_rep(self.rep_id, returncode, "successful")
         self.db.save_test_results(self.rep_id, results)
-
-        self.under_test_container.terminate()
-
-        LOG.info(
-            "🛜  Waiting for endpoint to disappear %s",
-            self.under_test_container.endpoint(),
-        )
-        for retry in range(23):
-            if not self.under_test_container.up():
-                break
-            time.sleep(1 * retry)
-        if self.under_test_container.up():
-            LOG.warning(
-                "🛜  Endpoint %s still up after %s retries?!",
-                self.under_test_container.endpoint(),
-                retry,
-            )
+        self.under_test_stop(test)
 
     def save_under_test_container_env_once(self):
         # call this after first run() - under test container usually
