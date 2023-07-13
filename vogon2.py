@@ -5,6 +5,10 @@ import pathlib
 import sqlite3
 import subprocess
 import tarfile
+import requests
+import itertools
+import random
+import socket
 import time
 from typing import Any
 
@@ -66,6 +70,36 @@ class ContainerManager:
             "image-tags": ";".join(self.image.tags),
         }
 
+    def network_address(self):
+        for retry in range(5):
+            addr = self.container.attrs["NetworkSettings"]["IPAddress"]
+            if addr == "":
+                return "localhost"
+            elif addr:
+                return addr
+            time.sleep(2 * (retry + 1))
+            self.container.reload()
+        raise RuntimeError(
+            f"Container has no network address after {retry} tries. "
+            "Startup failed? "
+            "Check container logs."
+        )
+
+    def endpoint(self):
+        return ""
+
+    def up(self):
+        return self.container is not None
+
+
+def guess_free_host_port():
+    for randport_fn in itertools.repeat(lambda: random.randrange(10000, 20000)):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(("", randport_fn()))
+        port = sock.getsockname()[1]
+        sock.close()
+        return port
+
 
 class S3GW(ContainerManager):
     def __init__(
@@ -77,6 +111,7 @@ class S3GW(ContainerManager):
     ):
         self.storage = storage
         self.s3gw_version = "unknown"
+        self.port = guess_free_host_port()
         super().__init__(cri, image, pull_image)
 
     def run(self, **args):
@@ -102,7 +137,7 @@ class S3GW(ContainerManager):
                 "--debug-rgw",
                 "1",
                 "--rgw-frontends",
-                "beast port=7480, status bind=0.0.0.0 port=9090",
+                f"beast port={self.port}, status bind=0.0.0.0 port=9090",
             ],
         )
         ret, version = self.container.exec_run(["radosgw", "--version"])
@@ -116,6 +151,16 @@ class S3GW(ContainerManager):
         e = super().env()
         e["s3gw-version"] = self.s3gw_version
         return e
+
+    def up(self):
+        try:
+            resp = requests.head(f"http://{self.endpoint()}")
+            return resp.ok
+        except requests.exceptions.ConnectionError:
+            return False
+
+    def endpoint(self):
+        return f"{self.network_address()}:{self.port}"
 
 
 class Storage:
@@ -380,7 +425,6 @@ class WarpTest(ContainerizedTest):
     default_container_image = "minio/warp"
     default_args = ["--no-color"]
     default_workload_args = [
-        "--host=localhost:7480",
         "--access-key=test",
         "--secret-key=test",
         "--noclear",  # vogon restarts and runs mkfs between runs
@@ -406,17 +450,18 @@ class WarpTest(ContainerizedTest):
         self.warp_version: str = "unknown"
         self.json_results: dict = {}
 
-    def make_args(self):
+    def make_args(self, endpoint):
         args = []
         args.extend(self.default_args)
         args.append(self.workload)
         args.extend(self.default_workload_args)
+        args.append(f"--host={endpoint}")
         args.extend(self.args)
         return args
 
     def run(self, instance: "TestRunner"):
         self.container = ContainerManager(instance.cri, self.container_image)
-        args = self.make_args()
+        args = self.make_args(instance.under_test_container.endpoint())
         LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
             command=args,
@@ -584,7 +629,7 @@ class TestRunner:
 
     def run_suite(self, suite):
         self.suite_id = results_db.make_id()
-        LOG.info(f"▶️ STARTING TEST SUITE {suite.name} ID {self.suite_id}")
+        LOG.info(f"🏃️  STARTING TEST SUITE {suite.name} ID {self.suite_id}")
         LOG.info(f"♻️  {self.reps} REPS / TEST")
         self.db.save_before_suite(self.suite_id, suite.name, suite.description)
         self.db.save_test_environment_default(self.suite_id)
@@ -627,8 +672,23 @@ class TestRunner:
         self.under_test_container.run(name=f"under_test_{self.rep_id}")
         self.save_under_test_container_env_once()
 
-        # TODO be smarter about the started condition
-        time.sleep(10)
+        LOG.info("🛜  Waiting for endpoint %s", self.under_test_container.endpoint())
+        for retry in range(23):
+            if self.under_test_container.up():
+                break
+            time.sleep(1 * retry)
+        if not self.under_test_container.up():
+            LOG.warning(
+                "🛜  Endpoint %s not up after %s retries. Failing test rep.",
+                self.under_test_container.endpoint(),
+                retry,
+            )
+            raise AbortTest
+        LOG.info(
+            "🛜  Endpoint %s up after %s retries",
+            self.under_test_container.endpoint(),
+            retry,
+        )
 
         self.storage.drop_caches()
         try:
@@ -676,6 +736,21 @@ class TestRunner:
         self.db.save_test_results(self.rep_id, results)
 
         self.under_test_container.terminate()
+
+        LOG.info(
+            "🛜  Waiting for endpoint to disappear %s",
+            self.under_test_container.endpoint(),
+        )
+        for retry in range(23):
+            if not self.under_test_container.up():
+                break
+            time.sleep(1 * retry)
+        if self.under_test_container.up():
+            LOG.warning(
+                "🛜  Endpoint %s still up after %s retries?!",
+                self.under_test_container.endpoint(),
+                retry,
+            )
 
     def save_under_test_container_env_once(self):
         # call this after first run() - under test container usually
