@@ -165,6 +165,7 @@ class S3GW(ContainerManager):
 
 class Storage:
     "A storage device to run the program under test on"
+    pristine_filesystem_allow = {"lost+found"}
 
     def __init__(
         self,
@@ -252,11 +253,11 @@ class Storage:
                         LOG.debug(f"mkfs: {e.output}")
                         LOG.warning(
                             f"mkfs: still in use. retrying mkfs in a bit. "
-                            f"retry {retry_count}"
+                            f"retry {retry_count}."
                         )
                         time.sleep(1 * retry_count)
                         continue
-                    break
+                    raise e
 
             mount_out = subprocess.check_output(
                 ["sudo", "mount", str(self.partition), str(self.mountpoint.absolute())],
@@ -270,14 +271,29 @@ class Storage:
             )
             LOG.debug("chown out: %s", chown_out)
 
+            if not self.is_pristine():
+                LOG.error(
+                    f"{self.mountpoint}: unexpected data. "
+                    "mountpoint not pristine. "
+                    "failing benchmark."
+                )
+                raise Exception("mountpoint not pristine")
+
         except subprocess.CalledProcessError as e:
             LOG.exception(
                 "storage reset (umount,mkfs,mount) failed with exit %s out %s. "
-                "failing benchmark",
+                "failing benchmark.",
                 e.returncode,
                 e.output,
             )
             raise e
+
+    def is_pristine(self):
+        files_and_dirs_on_mountpoint = itertools.filterfalse(
+            lambda x: x.name in self.pristine_filesystem_allow,
+            self.mountpoint.iterdir(),
+        )
+        return not next(files_and_dirs_on_mountpoint, False)
 
     def env(self):
         return self.env_data
