@@ -130,6 +130,8 @@ class S3GW(ContainerManager):
             command=[
                 "--rgw-backend-store",
                 "sfs",
+                "--rgw-s3gw-enable-telemetry",
+                "0",
                 "--rgw-enable-ops-log",
                 "0",
                 "--rgw-log-object-name",
