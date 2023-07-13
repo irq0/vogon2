@@ -242,7 +242,7 @@ class Storage:
                     break
 
             time.sleep(1)
-            for retry_count in range(1, 23):
+            for retry_count in range(1, 42):
                 try:
                     mkfs_out = subprocess.check_output(
                         self.mkfs_command + [str(self.partition)],
@@ -254,10 +254,14 @@ class Storage:
                     if b"apparently in use by the system" in e.output:
                         LOG.debug(f"mkfs: {e.output}")
                         LOG.warning(
-                            f"mkfs: still in use. retrying mkfs in a bit. "
+                            f"mkfs: still in use. sync'ing. retrying mkfs in a bit. "
                             f"retry {retry_count}."
                         )
-                        time.sleep(1 * retry_count)
+                        sync_out = subprocess.check_output(
+                            ["sync"], stderr=subprocess.STDOUT
+                        )
+                        LOG.debug("sync: %s", sync_out)
+                        time.sleep(10 * retry_count)
                         continue
                     raise e
 
@@ -279,6 +283,7 @@ class Storage:
                     "mountpoint not pristine. "
                     "failing benchmark."
                 )
+                LOG.debug(list(self.mountpoint.iterdir()))
                 raise Exception("mountpoint not pristine")
 
         except subprocess.CalledProcessError as e:
@@ -665,7 +670,7 @@ class TestRunner:
         LOG.info(f"🔎 TEST {test} ID {self.test_id}")
 
         for rep in range(self.reps):
-            LOG.info("▶️ %s REP %s/%s", test.name, rep, self.reps)
+            LOG.info("▶️  %s REP %s/%s", test.name, rep, self.reps)
             try:
                 self.run_test_rep(test)
             except Exception:
