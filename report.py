@@ -496,7 +496,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 all_div.add(T.p("At least one test suite failed this test :("))
                 continue
 
-            labels = ["FIO Baseline"] + [f"{suite['suite_id']:9.9}" for suite in suites]
+            labels = ["FIO Baseline"] + [f"{suite['human-id']}" for suite in suites]
 
             try:
                 bw = db.get_normalized_results("bw-mean", rep_ids)
@@ -546,7 +546,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     # Comparison Tables
     def comparision_table(a, b):
         div = T.div()
-        div.add(T.h3(f"{a['suite_id']:9.9} ➙ {b['suite_id']:9.9}"))
+        div.add(T.h3(f"{a['human-id']} ➙ {b['human-id']}"))
         div.add(T.p(f"{a['description']} ➙ {b['description']}"))
         table = div.add(T.table())
         thead = table.add(T.thead())
@@ -651,14 +651,14 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         if test["success"]:
                             table.add(
                                 T.tr(
-                                    T.th(f"{suite['suite_id']:9.9}"),
+                                    T.th(f"{suite['human-id']}"),
                                     T.td(warp_latency_graph(max(test["reps"]))),
                                 )
                             )
                         else:
                             table.add(
                                 T.tr(
-                                    T.th(f"{suite['suite_id']:9.9}"),
+                                    T.th(f"{suite['human-id']}"),
                                     T.td("failed"),
                                 )
                             )
@@ -677,10 +677,12 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 combined[k].append(suite.get(k, "-"))
 
         def sort_key_fn(thing):
-            if thing[0] in ("suite_id", "name", "description"):
-                return "AAAAAAA"
-            elif thing[0].startswith("under-test-"):
+            if thing[0] == "human-id":
+                return "AAAAAA"
+            elif thing[0] in ("suite_id", "name", "description"):
                 return "BBBBBBB"
+            elif thing[0].startswith("under-test-"):
+                return "CCCCCCC"
             else:
                 return str(thing[0])
 
@@ -694,6 +696,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         v = v.decode("utf-8")
                     if k == "suite_id":
                         T.td(T.strong(v[:9]), v[9:])
+                    elif k == "human-id":
+                        T.th(v)
                     else:
                         T.td(v)
         return div

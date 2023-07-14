@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import platform
 import sqlite3
+import re
 import typing
 import uuid
 from contextlib import closing
@@ -354,6 +355,22 @@ class ResultsDB:
                 except (UnicodeDecodeError, AttributeError):
                     v = str(v)
                 results[k] = v
+
+        if m := re.search(
+            r"(?:v|nightly-)(\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2})",
+            results["under-test-image-tags"],
+        ):
+            human_version = m.group(1)
+        else:
+            human_version = "?"
+        if m := re.search(r"(\d{4}-\d{2}-\d{2})", results["finished"]):
+            when = m.group(1)
+        else:
+            when = "?"
+        if human_version == when:
+            results["human-id"] = f"🌃{when}"
+        else:
+            results["human-id"] = f"️{human_version}@{when}"
         return results
 
     def get_test_runs(self, suite_id: IDType):
