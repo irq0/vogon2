@@ -363,14 +363,11 @@ class ResultsDB:
             human_version = m.group(1)
         else:
             human_version = "?"
-        if m := re.search(r"(\d{4}-\d{2}-\d{2})", results["finished"]):
-            when = m.group(1)
+
+        if "nightly" in results["under-test-image-tags"]:
+            results["human-id"] = f"🌃{human_version}"
         else:
-            when = "?"
-        if human_version == when:
-            results["human-id"] = f"🌃{when}"
-        else:
-            results["human-id"] = f"️{human_version}@{when}"
+            results["human-id"] = f"️{human_version}"
         return results
 
     def get_test_runs(self, suite_id: IDType):
