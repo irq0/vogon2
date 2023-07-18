@@ -284,12 +284,16 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         SELECT suites.suite_id, value
         FROM suites
         INNER JOIN environment
-        ON (suites.suite_id = environment.suite_id)
+         ON (suites.suite_id = environment.suite_id)
+        INNER JOIN tests
+         ON (suites.suite_id = tests.suite_id)
         WHERE key = 'under-test-image-tags'
         AND value GLOB ?
         AND suites.name = ?
         AND suites.finished not null
-        ORDER BY finished DESC
+        GROUP BY suites.suite_id
+        HAVING tests.finished not null
+        ORDER BY suites.finished DESC
         LIMIT 5;
         """,
             (image_match, suites_match),
