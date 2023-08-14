@@ -25,7 +25,13 @@ AUTOGEN_SLEEP_TIME_SEC = 42 * 60
 
 class Job:
     required_keys = ("under_test_image", "suite")
-    env_keys = ("under_test_image", "under_test_image_pull", "suite", "repetitions")
+    env_keys = (
+        "under_test_image",
+        "under_test_image_pull",
+        "suite",
+        "repetitions",
+        "mkfs",
+    )
 
     @staticmethod
     def parse(job_path: pathlib.Path, rejected_dir: pathlib.Path):
