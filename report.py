@@ -152,7 +152,7 @@ def make_comparison_table(
             pprint(test_a, test_b)
             raise IncompatibleSuites
         test = test_a
-        out_row = [(test, "")] + [""] * (len(cols.a) - 1)
+        out_row = [(test, "")] + [("-", "")] * (len(cols.a) - 1)
 
         for a, b in zip(rows_a, rows_b):
             if a[0] != b[0]:
