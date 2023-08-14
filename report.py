@@ -323,13 +323,6 @@ def containers(ctx, docker_api, suite_id):
             )
 
     console.print(table)
-    console.print("Other related containers:")
-    related_rest = [
-        c
-        for c in all_containers.values()
-        if any("vogon" in label for label in c.labels)
-    ]
-    console.print(", ".join([c.name for c in related_rest] or ("none",)))
 
 
 @report.command()
