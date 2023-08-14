@@ -194,27 +194,46 @@ def report(ctx, sqlite):
 @click.pass_context
 def testruns(ctx):
     "List testruns"
-    select_print_table(
-        ctx.obj["db"].db,
+    db = ctx.obj["db"]
+    console = Console()
+    table = Table(show_header=True, box=rich.box.SIMPLE)
+
+    cur = db.db.cursor()
+    result = cur.execute(
         """
     SELECT
-      suites.suite_id,
-      suites.start,
-      case
-        when length(suites.description) > 20
-        then substr(suites.description, 1, 20) || "..."
-        else suites.description
-      end as comment,
-      round((julianday(suites.finished)-julianday(suites.start)) * 24 * 60)
-        as runtime_min,
-      suites.name,
-      count(test_repetitions.test_id) as n_tests
-    FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
-      JOIN test_repetitions ON (tests.test_id = test_repetitions.test_id)
-    GROUP BY suites.suite_id
+      suites.suite_id
+    FROM suites
     ORDER BY suites.start
     """,
+        [],
     )
+
+    table.add_column("")
+    table.add_column("ID")
+    table.add_column("Started")
+    table.add_column("Name")
+    table.add_column("Runtime [min]")
+    table.add_column("#Tests")
+    table.add_column("Image Tags")
+
+    for row in result:
+        suite_id = row[0]
+        try:
+            details = db.get_testrun_details(suite_id)
+        except Exception:
+            continue
+        table.add_row(
+            details["human-id"],
+            suite_id,
+            details["start"],
+            details["name"],
+            details["runtime_min"],
+            details["n_tests"],
+            details.get("under-test-image-tags", "?"),
+        )
+    cur.close()
+    console.print(table)
 
 
 @report.command()
