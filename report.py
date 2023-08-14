@@ -547,9 +547,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             ops_ordered = [
                 ops["read-iops-mean"],
                 ops["write-iops-mean"],
-                ops.get("delete-iops-mean", -1),
-                ops.get("list-iops-mean", -1),
-                ops.get("stat-iops-mean", -1),
+                ops.get("delete-iops-mean", 0),
+                ops.get("list-iops-mean", 0),
+                ops.get("stat-iops-mean", 0),
             ]
             ops_labels = ["GET", "PUT", "DELETE", "LIST", "STAT"]
 
