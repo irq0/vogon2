@@ -689,11 +689,11 @@ class TestRunner:
         LOG.info(f"♻️  {self.reps} REPS / TEST")
         self.db.save_before_suite(self.suite_id, suite.name)
         self.db.save_test_environment_default(self.suite_id)
-        self.db.save_test_environment(self.suite_id, self.storage.env())
 
         for test in suite.tests:
             self.run_test(test)
 
+        self.db.save_test_environment(self.suite_id, self.storage.env())
         self.db.save_after_suite(self.suite_id)
 
     def run_test(self, test: Test):
