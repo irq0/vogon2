@@ -618,9 +618,8 @@ class WarpTest(ContainerizedTest):
 
 
 class TestSuite:
-    def __init__(self, name: str, description: str, tests: list[Test]):
+    def __init__(self, name: str, tests: list[Test]):
         self.name = name
-        self.description = description
         self.tests = tests
 
 
@@ -654,7 +653,7 @@ class TestRunner:
         self.suite_id = results_db.make_id()
         LOG.info(f"🏃️  STARTING TEST SUITE {suite.name} ID {self.suite_id}")
         LOG.info(f"♻️  {self.reps} REPS / TEST")
-        self.db.save_before_suite(self.suite_id, suite.name, suite.description)
+        self.db.save_before_suite(self.suite_id, suite.name)
         self.db.save_test_environment_default(self.suite_id)
         self.db.save_test_environment(self.suite_id, self.storage.env())
 
@@ -790,25 +789,25 @@ class TestRunner:
 
 
 test_suites = [
+    # Test disk baseline performance
     TestSuite(
         "baseline",
-        "Test disk baseline performance",
         tests=[
             FIOTest("fio-rand-RW", SCRIPT_PATH / "fio" / "fio-rand-RW.fio"),
         ],
     ),
+    # Test disk baseline performance
     TestSuite(
         "fio-read-write-rw",
-        "Test disk baseline performance",
         tests=[
             FIOTest("fio-rand-RW", SCRIPT_PATH / "fio" / "fio-rand-RW.fio"),
             FIOTest("fio-rand-read", SCRIPT_PATH / "fio" / "fio-rand-read.fio"),
             FIOTest("fio.rand-write", SCRIPT_PATH / "fio" / "fio-rand-write.fio"),
         ],
     ),
+    # Fast demo test suite",
     TestSuite(
         "demo",
-        "Fast demo test suite",
         tests=[
             WarpTest(
                 "mixed-fast",
@@ -836,9 +835,9 @@ test_suites = [
             ),
         ],
     ),
+    # S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.)
     TestSuite(
         "warp-all-simple-default",
-        "S3 micro benchmarks. Simple operations (GET, PUT, DELETE, list, etc.).",
         tests=[
             WarpTest("mixed-default", "mixed"),
             WarpTest("get-default", "get"),
@@ -848,9 +847,9 @@ test_suites = [
             WarpTest("stat-default", "stat"),
         ],
     ),
+    # Warp: Single Operation Benchmarks
     TestSuite(
         "warp-single-op",
-        "Warp: Single Operation Benchmarks",
         tests=[
             # PUT
             WarpTest(
@@ -1091,9 +1090,9 @@ test_suites = [
             ),
         ],
     ),
+    # Warp mixed 30m
     TestSuite(
         "warp-mixed-long",
-        "Warp mixed 30m",
         tests=[
             # default warp mixed with > RAM size dataset
             WarpTest(
@@ -1113,7 +1112,6 @@ test_suites = [
     ),
     TestSuite(
         "ideas",
-        "?",
         tests=[
             WarpTest(
                 "restric-alike",

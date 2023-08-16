@@ -126,12 +126,12 @@ class ResultsDB:
         self.db.commit()
         cur.close()
 
-    def save_before_suite(self, suite_id: IDType, suite_name: str, description: str):
+    def save_before_suite(self, suite_id: IDType, suite_name: str):
         cur = self.db.cursor()
         cur.execute(
             """insert into suites (suite_id, start, name, description)
-                                    values (?, strftime('%Y-%m-%d %H:%M:%f'), ?, ?);""",
-            (suite_id, suite_name, description),
+               values (?, strftime('%Y-%m-%d %H:%M:%f'), ?, '');""",
+            (suite_id, suite_name),
         )
         self.db.commit()
         cur.close()
