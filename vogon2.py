@@ -208,7 +208,40 @@ class Storage:
             "disk-rotational": d["rota"],
             "disk-scheduler": d["sched"],
             "disk-physical-sector-size": d["phy-sec"],
+            "fs-mkfs-command": " ".join(mkfs_command),
         }
+
+    def store_filesystem_env_data(self):
+        out = subprocess.check_output(
+            [
+                "lsblk",
+                "--output",
+                "FSTYPE,FSSIZE",
+                "--bytes",
+                "--json",
+                str(self.partition),
+            ]
+        )
+        fs = json.loads(out)["blockdevices"][0]
+        self.env_data["fs-type"] = fs["fstype"]
+        self.env_data["fs-size-bytes"] = fs["fssize"]
+
+        if fs["fstype"] == "xfs":
+            try:
+                out = subprocess.check_output(
+                    ["sudo", "/usr/sbin/xfs_info", self.mountpoint]
+                )
+                self.env_data["fs-xfs-info"] = out
+            except Exception:
+                pass
+        elif fs["fstype"] == "ext4":
+            try:
+                out = subprocess.check_output(
+                    ["sudo", "/usr/sbin/dumpe2fs", self.partition]
+                )
+                self.env_data["fs-ext4-info"] = out
+            except Exception:
+                pass
 
     def reset(self):
         if not self.enable_reset_mkfs_mount:
@@ -286,6 +319,7 @@ class Storage:
                 LOG.debug(list(self.mountpoint.iterdir()))
                 raise Exception("mountpoint not pristine")
 
+            self.store_filesystem_env_data()
         except subprocess.CalledProcessError as e:
             LOG.exception(
                 "storage reset (umount,mkfs,mount) failed with exit %s out %s. "
