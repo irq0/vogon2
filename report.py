@@ -288,6 +288,40 @@ def show(ctx, suite_id):
 
 
 @report.command()
+@click.argument("suite-id", type=str)
+@click.argument("desc", type=str, default="")
+@click.pass_context
+def rename(ctx, suite_id, desc):
+    """
+    Set test suite run description. Will become the human-id and
+    used in reports afterwards
+    """
+    db = ctx.obj["db"]
+    console = Console()
+    details = db.get_testrun_details(suite_id)
+    assert details
+
+    table = Table(show_header=False, box=rich.box.SIMPLE)
+    table.add_column(style="green")
+    table.add_column()
+    table.add_row("Before", "-" * 10)
+    table.add_row("suite_id", details["suite_id"])
+    table.add_row("human-id", details["human-id"])
+    table.add_row("description", details["description"])
+
+    with closing(db.db.cursor()) as cur:
+        cur.execute(
+            "UPDATE suites SET description = ? WHERE suite_id = ?", [desc, suite_id]
+        )
+        db.db.commit()
+    details = db.get_testrun_details(suite_id)
+    table.add_row("Now", "-" * 10)
+    table.add_row("human-id", details["human-id"])
+    table.add_row("description", details["description"])
+    console.print(table)
+
+
+@report.command()
 @click.option(
     "--docker-api",
     type=str,

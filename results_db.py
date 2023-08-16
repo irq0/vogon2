@@ -368,6 +368,8 @@ class ResultsDB:
             results["human-id"] = f"🌃{human_version}"
         else:
             results["human-id"] = f"️{human_version}"
+        if results["description"]:
+            results["human-id"] = results["description"]
         return results
 
     def get_test_runs(self, suite_id: IDType):
