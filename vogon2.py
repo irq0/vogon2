@@ -237,7 +237,7 @@ class Storage:
         elif fs["fstype"] == "ext4":
             try:
                 out = subprocess.check_output(
-                    ["sudo", "/usr/sbin/dumpe2fs", self.partition]
+                    ["sudo", "/usr/sbin/dumpe2fs", "-h", self.partition]
                 )
                 self.env_data["fs-ext4-info"] = out
             except Exception:
