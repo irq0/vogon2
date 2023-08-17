@@ -340,7 +340,9 @@ class ResultsDB:
                   'cpu-model',
                   'cpu-count',
                   'memtotalkb',
-                  'node-name'
+                  'node-name',
+                  'fs-type',
+                  'fs-size-bytes'
                 )
                 """,
                 (suite_id,),
@@ -355,6 +357,14 @@ class ResultsDB:
                 except (UnicodeDecodeError, AttributeError):
                     v = str(v)
                 results[k] = v
+
+        if "memtotalkb" in results:
+            results["ram-gb"] = str(int(int(results["memtotalkb"]) / 10**6))
+            del results["memtotalkb"]
+
+        if "fs-size-bytes" in results:
+            results["fs-gb"] = str(int(int(results["fs-size-bytes"]) / 1024**3))
+            del results["fs-size-bytes"]
 
         if m := re.search(
             r"(?:v|nightly-)(\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2})",
