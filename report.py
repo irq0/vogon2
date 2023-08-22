@@ -506,17 +506,22 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
     def fail_table():
         failed_tests = [
-            t[test_name]
-            for t in suite_tests
+            (t[test_name], suites[i])
+            for i, t in enumerate(suite_tests)
             for test_name in all_test_names
             if not t[test_name]["success"]
         ]
         div = T.div()
         if failed_tests:
             table = div.add(T.table())
+            thead = table.add(T.thead())
+            with thead.add(T.tr()):
+                T.th("Testrun")
+                T.th("Failed test")
             tbody = table.add(T.body())
-            for test in failed_tests:
+            for test, suite in failed_tests:
                 with tbody.add(T.tr()):
+                    T.td(str(suite["human-id"]))
                     T.td(str(test["name"]))
                     # TODO add why?
         else:
@@ -539,19 +544,23 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 all_div.add(T.p("At least one test suite does not have this test :("))
                 continue
             if any(not t[test_name]["success"] for t in suite_tests):
-                all_div.add(T.p("At least one test suite failed this test :("))
-                continue
+                failed_in_suites = [
+                    suites[i]
+                    for i, t in enumerate(suite_tests)
+                    if not t[test_name]["success"]
+                ]
+                all_div.add(
+                    T.p(
+                        T.i(
+                            "Test failed in suite "
+                            + ", ".join(s["human-id"] for s in failed_in_suites)
+                        )
+                    )
+                )
 
             labels = ["FIO Baseline"] + [f"{suite['human-id']}" for suite in suites]
 
-            try:
-                bw = db.get_normalized_results("bw-mean", rep_ids)
-            except Exception:
-                all_div.add(
-                    T.p("At least one test suite doesn't have normalized results :(")
-                )
-                continue
-
+            bw = db.get_normalized_results("bw-mean", rep_ids)
             bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
                 x / 1024**2 for x in bw["write-bw-mean"]
             ]
@@ -572,11 +581,11 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             ops = db.get_normalized_results("iops-mean", rep_ids[1:])
 
             ops_ordered = [
-                ops["read-iops-mean"],
-                ops["write-iops-mean"],
-                ops.get("delete-iops-mean", 0),
-                ops.get("list-iops-mean", 0),
-                ops.get("stat-iops-mean", 0),
+                ops.get("read-iops-mean", float("nan")),
+                ops.get("write-iops-mean", float("nan")),
+                ops.get("delete-iops-mean", float("nan")),
+                ops.get("list-iops-mean", float("nan")),
+                ops.get("stat-iops-mean", float("nan")),
             ]
             ops_labels = ["GET", "PUT", "DELETE", "LIST", "STAT"]
 

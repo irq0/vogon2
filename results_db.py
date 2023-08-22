@@ -282,7 +282,7 @@ class ResultsDB:
                     (rep,),
                 ).fetchall()
                 if not rows:
-                    raise Exception(f"no data: {cur} {rows} {rep}")
+                    row_kvs = {k: float("nan") for k in keys}
                 row_kvs = {k: float(v) for k, v in rows}
 
                 for k in result:
