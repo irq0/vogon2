@@ -356,8 +356,8 @@ ResultList = [(str, Any, str)]
 
 
 class Test:
-    def __init__(self, name: str):
-        self.name = name
+    def __init__(self, description: str):
+        self._description = description
 
     def env(self, instance: "TestRunner") -> results_db.TestEnvType:
         "Return environment data. e.g test tool version"
@@ -371,8 +371,16 @@ class Test:
         "Run test to completion"
         raise NotImplementedError
 
-    def kind(self) -> str:
+    @classmethod
+    def kind(cls) -> str:
         raise NotImplementedError
+
+    def __str__(self) -> str:
+        return "Test()"
+
+    @property
+    def description(self) -> str:
+        return self._description
 
 
 class AbortTest(Exception):
@@ -380,9 +388,9 @@ class AbortTest(Exception):
 
 
 class ContainerizedTest(Test):
-    def __init__(self, name: str, container_image: DockerImageType):
+    def __init__(self, description: str, container_image: DockerImageType):
         self.container_image = container_image
-        super().__init__(name)
+        super().__init__(description)
 
     def run(self, instance: "TestRunner"):
         container_manager = ContainerManager(instance.cri, self.container_image)
@@ -394,8 +402,12 @@ class ContainerizedTest(Test):
     def results(self, instance: "TestRunner"):
         raise NotImplementedError
 
-    def kind(self) -> str:
+    @classmethod
+    def kind(cls) -> str:
         raise NotImplementedError
+
+    def __str__(self) -> str:
+        return "ContainerizedTest()"
 
 
 class HostTest(Test):
@@ -411,8 +423,12 @@ class HostTest(Test):
     def results(self, instance: "TestRunner") -> results_db.TestResultsType:
         raise NotImplementedError
 
-    def kind(self) -> str:
+    @classmethod
+    def kind(cls) -> str:
         raise NotImplementedError
+
+    def __str__(self) -> str:
+        return "HostTest()"
 
 
 class FIOTest(HostTest):
@@ -471,7 +487,8 @@ class FIOTest(HostTest):
 
         return result
 
-    def kind(self) -> str:
+    @classmethod
+    def kind(cls) -> str:
         return "FIO"
 
     def __str__(self) -> str:
@@ -496,8 +513,8 @@ class WarpTest(ContainerizedTest):
         "STAT": "stat",
     }
 
-    def __init__(self, name: str, workload: str, args: list[str] | None = None):
-        super().__init__(name, self.default_container_image)
+    def __init__(self, description: str, workload: str, args: list[str] | None = None):
+        super().__init__(description, self.default_container_image)
         self.workload = workload
         if args is None:
             self.args = []
@@ -639,7 +656,7 @@ class WarpTest(ContainerizedTest):
     def env(self, instance: "TestRunner"):
         env = self.container.env()
         env["warp-version"] = self.warp_version
-        env[self.name + "-args"] = " ".join(self.args)
+        env[self.description + "-args"] = " ".join(self.args)
         return env
 
     @classmethod
@@ -680,8 +697,8 @@ class TestRunner:
         self.test_id = "NA"
         self.rep_id = "NA"
 
-    def __str__(self):
-        return f"TestSuite(name={self.suite_name}, suite_id={self.suite_id})"
+    def __str__(self) -> str:
+        return f"TestSuite(suite_id={self.suite_id})"
 
     def run_suite(self, suite):
         self.suite_id = results_db.make_id()
@@ -699,11 +716,13 @@ class TestRunner:
     def run_test(self, test: Test):
         self.test_id = results_db.make_id()
 
-        self.db.save_before_test(self.suite_id, self.test_id, str(test), test.kind())
+        self.db.save_before_test(
+            self.suite_id, self.test_id, str(test), test.kind(), test.description
+        )
         LOG.info(f"🔎 TEST {test} ID {self.test_id}")
 
         for rep in range(self.reps):
-            LOG.info("▶️  %s REP %s/%s", test.name, rep, self.reps)
+            LOG.info("▶️  %s %s REP %s/%s", test.description, str(test), rep, self.reps)
             try:
                 self.run_test_rep(test)
             except Exception:
@@ -762,7 +781,7 @@ class TestRunner:
         self.rep_id = results_db.make_id()
         self.db.save_before_rep(self.test_id, self.rep_id)
         self.storage.reset()
-        LOG.info("🔎️ TEST %s REP ID %s", test.name, self.rep_id)
+        LOG.info("🔎️ TEST %s %s REP ID %s", test.description, str(test), self.rep_id)
         self.under_test_start(test)
         self.storage.drop_caches()
         try:
@@ -770,7 +789,7 @@ class TestRunner:
         except Exception as e:
             LOG.exception(
                 "😥 TEST %s REP ID %s failed with exception: %s",
-                test.name,
+                test.description,
                 self.rep_id,
                 e,
                 exc_info=True,
@@ -782,7 +801,7 @@ class TestRunner:
         if returncode != 0:
             LOG.error(
                 "😥 TEST %s REP ID %s finished with returncode != 0: %s",
-                test.name,
+                test.description,
                 self.rep_id,
                 returncode,
             )
@@ -797,7 +816,7 @@ class TestRunner:
         except Exception as e:
             LOG.exception(
                 "😥 TEST %s REP ID %s" " result parsing failed with exception: %s",
-                test.name,
+                test.description,
                 self.rep_id,
                 e,
                 exc_info=True,

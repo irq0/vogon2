@@ -147,13 +147,18 @@ class ResultsDB:
         cur.close()
 
     def save_before_test(
-        self, suite_id: IDType, test_id: IDType, test_name: str, kind: str
+        self,
+        suite_id: IDType,
+        test_id: IDType,
+        test_name: str,
+        kind: str,
+        description: str,
     ):
         cur = self.db.cursor()
         cur.execute(
-            """insert into tests (suite_id, test_id, start, name, kind)
-               values (?, ?, strftime('%Y-%m-%d %H:%M:%f'), ?, ?);""",
-            (suite_id, test_id, test_name, kind),
+            """insert into tests (suite_id, test_id, start, name, kind, description)
+               values (?, ?, strftime('%Y-%m-%d %H:%M:%f'), ?, ?, ?);""",
+            (suite_id, test_id, test_name, kind, description),
         )
         self.db.commit()
         cur.close()
@@ -449,6 +454,7 @@ def init_db(dbconn):
           start timestamp,
           finished timestamp,
           name text,
+          description text,
           kind varchar(10),
           foreign key(suite_id) references suites(suite_id)
         );
