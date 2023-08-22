@@ -309,6 +309,7 @@ class ResultsDB:
                 """,
                 (suite_id,),
             ).fetchone()
+            assert row, f"Testrun {suite_id} not found"
             for (k, _, _, _, _, _, _), v in zip(cur.description, row):
                 try:
                     k = k.decode("utf-8")
