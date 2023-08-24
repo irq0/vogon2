@@ -234,7 +234,13 @@ def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
         # run on every tag
         create_task(image, tag, "warp-mixed-long", todo_dir)
 
-        # run the comprehensive suite only on releases
+        # run the comprehensive suite on nightlies on thu, fri
+        if m := re.match(r"nightly-(\d{4}-\d{2}-\d{2})$", tag):
+            ts = datetime.strptime(m.group(1), "%Y-%m-%d")
+            if ts.isoweekday() in [4, 5]:
+                create_task(image, tag, "warp-single-op", todo_dir)
+
+        # run the comprehensive suite on releases
         if re.match(r"v\d+\.\d+\.\d+$", tag):
             create_task(image, tag, "warp-single-op", todo_dir)
 
