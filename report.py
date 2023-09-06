@@ -271,14 +271,16 @@ def show(ctx, suite_id):
     console.print(table)
 
     table = Table(box=rich.box.SIMPLE)
-    table.add_column("Test Name", style="red")
-    table.add_column("Test ID")
+    table.add_column("Test", style="red")
+    table.add_column("Description", style="green")
+    table.add_column("Testrun ID")
     table.add_column("Success")
     table.add_column("Repetition IDs")
 
     for test in db.get_test_runs(suite_id).values():
         table.add_row(
             test["name"],
+            test["description"],
             test["test_id"],
             ["😫", "✅"][int(test["success"])],
             ", ".join(test["reps"]),

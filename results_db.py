@@ -397,6 +397,7 @@ class ResultsDB:
                 SELECT
                   tests.test_id,
                   tests.name,
+                  tests.description,
                   tests.finished not null,
                   group_concat(test_repetitions.rep_id) as reps
                 FROM suites JOIN tests ON (suites.suite_id = tests.suite_id)
@@ -407,9 +408,10 @@ class ResultsDB:
                 """,
                 (suite_id,),
             ).fetchall()
-        for test_id, name, success, rep_ids in tests:
+        for test_id, name, desc, success, rep_ids in tests:
             results[name] = {
                 "name": name,
+                "description": desc,
                 "test_id": test_id,
                 "success": bool(success),
                 "reps": rep_ids.split(),
