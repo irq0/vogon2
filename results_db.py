@@ -377,6 +377,11 @@ class ResultsDB:
             results["under-test-image-tags"],
         ):
             human_version = m.group(1)
+        elif m := re.search(
+            r"pr-(\w+-\w+-\w+)",
+            results["under-test-image-tags"],
+        ):
+            human_version = f"⛙{m.group(1)}"
         else:
             human_version = "?"
 
