@@ -244,6 +244,10 @@ def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
         if re.match(r"v\d+\.\d+\.\d+$", tag):
             create_task(image, tag, "warp-single-op", todo_dir)
 
+        # run the comprehensive suite on PRs
+        if re.match(r"pr-\d+-\d+-\d+$", tag):
+            create_task(image, tag, "warp-single-op", todo_dir)
+
 
 @cli.command()
 @click.pass_context
