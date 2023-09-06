@@ -364,6 +364,26 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
     def last_single_op_release_and_nightlies():
         return last_single_op_nightlies()[:1] + [last_single_op_releases()[0]]
 
+    def on_pr_mixed():
+        last_pr = sorted(
+            last_matching_image_tag("*pr-*-*-*", "warp-mixed-long"),
+            key=itemgetter(1),
+            reverse=True,
+        )
+        return [last_pr[0], last_mixed_nightlies()[0], last_mixed_releases()[0]]
+
+    def on_pr_single_op():
+        last_pr = sorted(
+            last_matching_image_tag("*pr-*-*-*", "warp-single-op"),
+            key=itemgetter(1),
+            reverse=True,
+        )
+        return [
+            last_pr[0],
+            last_single_op_nightlies()[0],
+            last_single_op_releases()[0],
+        ]
+
     def latest_baseline():
         return cur.execute(
             """
@@ -422,6 +442,7 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
             ("weekly", last_single_op_release_and_nightlies, 2),
             ("release_comprehensive", last_single_op_releases, 1),
             ("nightly_comprehensive", last_single_op_nightlies, 1),
+            ("pr_quick", on_pr_mixed, 3),
         ]:
             benchmark_runs = list(reversed(bench_runs_fn()[:count]))
             LOG.debug(f"Last {count} runs for {group} group: {benchmark_runs}")
