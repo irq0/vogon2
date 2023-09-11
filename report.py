@@ -736,7 +736,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         def sort_key_fn(thing):
             if thing[0] == "human-id":
                 return "AAAAAA"
-            elif thing[0] in ("suite_id", "name", "description"):
+            elif thing[0] in ("suite_id", "name", "description", "url"):
                 return "BBBBBBB"
             elif thing[0].startswith("under-test-"):
                 return "CCCCCCC"
@@ -755,6 +755,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                         T.td(T.strong(v[:9]), v[9:])
                     elif k == "human-id":
                         T.th(v)
+                    elif k == "url":
+                        T.td(T.a("URL", href=v))
                     else:
                         T.td(v)
         return div

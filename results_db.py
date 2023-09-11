@@ -376,19 +376,30 @@ class ResultsDB:
             r"(?:v|nightly-)(\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2})",
             results["under-test-image-tags"],
         ):
-            human_version = m.group(1)
+            if "nightly" in results["under-test-image-tags"]:
+                results["human-id"] = f"🌃{m.group(1)}"
+                results["url"] = (
+                    "https://github.com/aquarist-labs"
+                    "/s3gw/actions/workflows/nightly.yaml"
+                )
+            else:
+                results["human-id"] = m.group(1)
+                results["url"] = (
+                    f"https://github.com/aquarist-labs"
+                    f"/s3gw/releases/tag/v{m.group(1)}"
+                )
         elif m := re.search(
-            r"pr-(\w+-\w+-\w+)",
+            r"pr-(?:\w+-(\w+)-\w+)",
             results["under-test-image-tags"],
         ):
-            human_version = f"⛙{m.group(1)}"
+            results["human-id"] = f"🏃{m.group(1)}"
+            results["url"] = (
+                f"https://github.com/aquarist-labs" f"/ceph/actions/runs/{m.group(1)}"
+            )
         else:
-            human_version = "?"
+            results["human-id"] = "?"
+            results["url"] = ""
 
-        if "nightly" in results["under-test-image-tags"]:
-            results["human-id"] = f"🌃{human_version}"
-        else:
-            results["human-id"] = f"️{human_version}"
         if results["description"]:
             results["human-id"] = results["description"]
         return results
