@@ -294,7 +294,21 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
     cur = dbconn.cursor()
     cur.execute("PRAGMA foreign_keys = ON;")
 
-    def last_matching_image_tag(image_match, suites_match):
+    def latest_baseline():
+        return cur.execute(
+            """
+        SELECT suite_id, max(finished)
+        FROM suites
+        WHERE suites.name = 'baseline';
+        """
+        ).fetchone()[0]
+
+    def last_matching_image_tag(image_match, suites_match, limit=5):
+        """
+        Return `limit` most recent benchmark `suites_match` runs
+        with under test image matching `image_match`. Sort results by
+        tag if that tag defines an order (eg. releases, nightlies)
+        """
         rows = cur.execute(
             """
         SELECT suites.suite_id, value
@@ -310,9 +324,9 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         GROUP BY suites.suite_id
         HAVING tests.finished not null
         ORDER BY suites.finished DESC
-        LIMIT 5;
+        LIMIT ?;
         """,
-            (image_match, suites_match),
+            (image_match, suites_match, limit),
         ).fetchall()
         result = []
         for k, v in rows:
@@ -324,78 +338,35 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
                     continue
                 tag = v.split(":")[1]
                 result.append((k, tag))
-        return result
 
-    def last_mixed_nightlies():
-        return sorted(
-            last_matching_image_tag("*nightly-*-*-*", "warp-mixed-long"),
-            key=itemgetter(1),
-            reverse=True,
-        )
+        # pr tags have not order
+        if "pr" in image_match:
+            return result
+        else:
+            return sorted(
+                result,
+                key=itemgetter(1),
+                reverse=True,
+            )
 
-    def last_mixed_releases():
-        return sorted(
-            [
-                release
-                for release in last_matching_image_tag(r"*v*.*.*", "warp-mixed-long")
-                if "-rc" not in release[1]
-            ],
-            key=itemgetter(1),
-            reverse=True,
-        )
+    def last_nightlies(suites):
+        return last_matching_image_tag("*nightly-*-*-*", suites)
 
-    def last_single_op_releases():
-        return sorted(
-            [
-                release
-                for release in last_matching_image_tag(r"*v*.*.*", "warp-single-op")
-                if "-rc" not in release[1]
-            ],
-            key=itemgetter(1),
-            reverse=True,
-        )
-
-    def last_single_op_nightlies():
-        return sorted(
-            last_matching_image_tag("*nightly-*-*-*", "warp-single-op"),
-            key=itemgetter(1),
-            reverse=True,
-        )
-
-    def last_mixed_release_and_nightlies():
-        return last_mixed_nightlies() + [last_mixed_releases()[0]]
-
-    def last_single_op_release_and_nightlies():
-        return last_single_op_nightlies()[:1] + [last_single_op_releases()[0]]
-
-    def on_pr_mixed():
-        last_pr = sorted(
-            last_matching_image_tag("*pr-*-*-*", "warp-mixed-long"),
-            key=itemgetter(1),
-            reverse=True,
-        )
-        return [last_pr[0], last_mixed_nightlies()[0], last_mixed_releases()[0]]
-
-    def on_pr_single_op():
-        last_pr = sorted(
-            last_matching_image_tag("*pr-*-*-*", "warp-single-op"),
-            key=itemgetter(1),
-            reverse=True,
-        )
+    def last_releases(suites):
         return [
-            last_pr[0],
-            last_single_op_nightlies()[0],
-            last_single_op_releases()[0],
+            release
+            for release in last_matching_image_tag(r"*v*.*.*", suites)
+            if "-rc" not in release[1]
         ]
 
-    def latest_baseline():
-        return cur.execute(
-            """
-        SELECT suite_id, max(finished)
-        FROM suites
-        WHERE suites.name = 'baseline';
-        """
-        ).fetchone()[0]
+    def last_prs(suites):
+        return last_matching_image_tag("*pr-*-*-*", suites)
+
+    def last_release_and_nightlies(suite):
+        return last_nightlies(suite) + [last_releases(suite)[0]]
+
+    def last_release_last_nightly_last_pr(suite):
+        return [last_prs(suite)[0], last_nightlies(suite)[0], last_releases(suite)[0]]
 
     def run_report_gen(config, filename, suite_ids):
         if "virtualenv" in config:
@@ -441,15 +412,27 @@ def report_creator(ctx, report_dir: pathlib.Path, sqlite, attach, config_file):
         notify = make_notify(config.get("notify", []))
 
         for group, bench_runs_fn, count in [
-            ("nightlies", last_mixed_release_and_nightlies, 6),
-            ("releases", last_mixed_releases, 3),
-            ("weekly", last_single_op_release_and_nightlies, 2),
-            ("release_comprehensive", last_single_op_releases, 1),
-            ("nightly_comprehensive", last_single_op_nightlies, 1),
-            ("pr_quick", on_pr_mixed, 3),
-            ("pr_comprehensive", on_pr_single_op, 3),
+            ("nightlies", lambda: last_release_and_nightlies("warp-mixed-long"), 6),
+            ("releases", lambda: last_releases("warp-single-op"), 3),
+            ("weekly", lambda: last_release_and_nightlies("warp-single-op"), 2),
+            ("release_comprehensive", lambda: last_releases("warp-single-op"), 1),
+            ("nightly_comprehensive", lambda: last_nightlies("warp-single-op"), 1),
+            (
+                "pr_quick",
+                lambda: last_release_last_nightly_last_pr("warp-mixed-long"),
+                3,
+            ),
+            (
+                "pr_comprehensive",
+                lambda: last_release_last_nightly_last_pr("warp-single-op"),
+                3,
+            ),
         ]:
-            benchmark_runs = list(reversed(bench_runs_fn()[:count]))
+            try:
+                benchmark_runs = list(reversed(bench_runs_fn()[:count]))
+            except IndexError:
+                LOG.debug(f"Group {group} has no benchmark runs at this time. skipping")
+                continue
             LOG.debug(f"Last {count} runs for {group} group: {benchmark_runs}")
             report_fn = (
                 report_dir / f"{group}_{'+'.join([x[1] for x in benchmark_runs])}.html"
