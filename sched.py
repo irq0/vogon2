@@ -245,7 +245,7 @@ def task_creator(ctx, todo_dir: pathlib.Path, seen_dir: pathlib.Path):
             create_task(image, tag, "warp-single-op", todo_dir)
 
         # run the comprehensive suite on PRs
-        if re.match(r"pr-\d+-\d+-\d+$", tag):
+        if re.match(r"pr-\w+-\d+-\d+$", tag):
             create_task(image, tag, "warp-single-op", todo_dir)
 
 
