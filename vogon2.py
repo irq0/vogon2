@@ -958,6 +958,28 @@ test_suites = [
                     "--obj.randsize=false",
                 ],
             ),
+            WarpTest(
+                "put-c1-uniform256-nomulti",
+                "put",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--disable-multipart",
+                    "--obj.randsize=false",
+                ],
+            ),
+            WarpTest(
+                "put-c20-uniform256-nomulti",
+                "put",
+                [
+                    "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=256",
+                    "--disable-multipart",
+                    "--obj.randsize=false",
+                ],
+            ),
             # GET
             WarpTest(
                 "get-c20-uniform32M",
@@ -1027,6 +1049,29 @@ test_suites = [
                     "--obj.generator=random",
                     "--obj.randsize=true",
                     "--objects=2048",
+                ],
+            ),
+            # S3 SELECT
+            WarpTest(
+                "select-c20-uniform32M",
+                "select",
+                [
+                    "--concurrent=20",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                    "--objects=8192",
+                ],
+            ),
+            WarpTest(
+                "select-c1-uniform32M",
+                "select",
+                [
+                    "--concurrent=1",
+                    "--duration=10m",
+                    "--obj.size=32MiB",
+                    "--obj.randsize=false",
+                    "--objects=8192",
                 ],
             ),
             # LIST
@@ -1139,6 +1184,33 @@ test_suites = [
                     "--obj.size=32MiB",
                     "--obj.randsize=false",
                     "--objects=8192",
+                ],
+            ),
+            # MIXED (GET, PUT, DELETE)
+            WarpTest(
+                "mixed-c20",
+                "mixed",
+                [
+                    "--duration=10m",
+                    "--get-distrib=45",
+                    "--stat-distrib=30",
+                    "--put-distrib=15",
+                    "--delete-distrib=10",
+                    "--objects=20000",
+                    "--obj.size=10MiB",
+                ],
+            ),
+            WarpTest(
+                "versioned-c20",
+                "versioned",
+                [
+                    "--duration=10m",
+                    "--get-distrib=45",
+                    "--stat-distrib=30",
+                    "--put-distrib=15",
+                    "--delete-distrib=10",
+                    "--objects=20000",
+                    "--obj.size=10MiB",
                 ],
             ),
         ],
