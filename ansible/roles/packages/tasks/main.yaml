@@ -41,6 +41,9 @@
       - parted
       - perf
       - bcc-tools
+      - noto-sans-fonts
+      - noto-coloremoji-fonts
+      - gdouros-symbola-fonts
     state: present
 
 - name: enable systemd persistent journal
