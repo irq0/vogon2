@@ -90,14 +90,17 @@ def make_comparison_bargraph_svg(labels, ys, ys_label, ylabel):
     return svg
 
 
-def make_percentiles_svg(ys, ylabel, ymax):
+def make_percentiles_svg(ys, ylabel, ymax, format_bps=False):
     xaxis = np.arange(101)
     fig, ax = plt.subplots()
-    ax.bar(xaxis, ys, width=2, linewidth=0.7, edgecolor="white")
+    ax.bar(xaxis, ys, width=1, linewidth=1, edgecolor="white")
     ax.set_axisbelow(True)
     ax.grid()
     ax.set(xlim=(0, 100), ylim=(0, ymax))
     ax.set_ylabel(ylabel)
+    if format_bps:
+        ax.yaxis.set_major_formatter(lambda x, pos: format_bytes(x))
+
     fig.tight_layout()
     svg_fd = io.StringIO()
     fig.savefig(svg_fd, format="svg", transparent=True)
@@ -593,7 +596,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             ]
 
             div = all_div.add(T.div(style="display: flex; flex-wrap: wrap;"))
-            fig = div.add(T.figure(klass="pure-img", style="width: 25rem;"))
+            fig = div.add(T.figure(klass="pure-img bar-chart"))
             fig.add(T.figcaption("Throughput"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
@@ -617,7 +620,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             ]
             ops_legend = ["GET", "PUT", "DELETE", "LIST", "STAT"]
 
-            fig = div.add(T.figure(klass="pure-img", style="width: 25rem;"))
+            fig = div.add(T.figure(klass="pure-img bar-chart"))
             fig.add(T.figcaption("Operations"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
@@ -661,7 +664,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         op_ymax = {
             "PUT": 2000,
         }
-        all_div = T.div(style="display: flex; flex-wrap: wrap;")
+        all_div = T.div(klass="pure-g drill-down-row")
         with closing(db.db.cursor()) as cur:
             data = json.loads(
                 cur.execute(
@@ -679,17 +682,16 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             for op in data["operations"]:
                 if op["skipped"]:
                     continue
-                fig = all_div.add(
-                    T.figure(
-                        klass="pure-img",
-                        style="width: 20rem;",
-                        title=(
-                            "Request duration percentiles in milliseconds,"
-                            f" test rep {rep_id}"
-                        ),
-                    )
-                )
                 if "single_sized_requests" in op:
+                    fig = all_div.add(
+                        T.figure(
+                            klass="pure-img drill-down pure-u-2-5",
+                            title=(
+                                "Request duration percentiles in milliseconds,"
+                                f" test rep {rep_id}"
+                            ),
+                        )
+                    )
                     stats = op["single_sized_requests"]
                     fig.add_raw_string(
                         make_percentiles_svg(
@@ -703,23 +705,83 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                             T.table(
                                 T.tr(
                                     T.td("op"),
+                                    T.td(""),
                                     T.td("fastest [ms]"),
                                     T.td("slowest [ms]"),
                                     T.td("avg [ms]"),
                                     T.td("median [ms]"),
+                                    T.td("p99 [ms]"),
+                                    T.td("obj size [byte]"),
                                 ),
                                 T.tr(
                                     T.th(op["type"]),
+                                    T.td("latency"),
                                     T.td(stats["fastest_millis"]),
                                     T.td(stats["slowest_millis"]),
                                     T.td(stats["dur_avg_millis"]),
                                     T.td(stats["dur_median_millis"]),
+                                    T.td(stats["dur_99_millis"]),
+                                    T.td(format_bytes(stats["obj_size"])),
                                 ),
                             )
                         )
                     )
+                elif "multi_sized_requests" in op:
+                    all_multi_op_div = all_div
+                    size_buckets = op["multi_sized_requests"]["by_size"]
+
+                    for stats in size_buckets:
+                        fig = all_multi_op_div.add(
+                            T.figure(
+                                title=(
+                                    "Throughput percentiles in bytes,"
+                                    f" test rep {rep_id}"
+                                ),
+                                klass="pure-img drill-down pure-u-2-5",
+                            )
+                        )
+                        fig.add_raw_string(
+                            make_percentiles_svg(
+                                stats["bps_percentiles"],
+                                "Throughput [byte/s]",
+                                op_ymax.get(op["type"], stats["bps_fastest"]),
+                                True,
+                            )
+                        )
+                        fig.add(
+                            T.figcaption(
+                                T.table(
+                                    T.tr(
+                                        T.td("op"),
+                                        T.td(""),
+                                        T.td("min obj size [byte]"),
+                                        T.td("avg obj size [byte]"),
+                                        T.td("max obj size [byte]"),
+                                        T.td("requests [count]"),
+                                        T.td("slowest [byte/s]"),
+                                        T.td("fastest [byte/s]"),
+                                        T.td("average [byte/s]"),
+                                        T.td("median [byte/s]"),
+                                        T.td("p99 [byte/s]"),
+                                    ),
+                                    T.tr(
+                                        T.th(op["type"]),
+                                        T.td("multi sized throughput"),
+                                        T.td(format_bytes(stats["min_size"])),
+                                        T.td(format_bytes(stats["avg_obj_size"])),
+                                        T.td(format_bytes(stats["max_size"])),
+                                        T.td(stats["requests"]),
+                                        T.td(format_bytes(stats["bps_slowest"])),
+                                        T.td(format_bytes(stats["bps_fastest"])),
+                                        T.td(format_bytes(stats["bps_average"])),
+                                        T.td(format_bytes(stats["bps_median"])),
+                                        T.td(format_bytes(stats["bps_99"])),
+                                    ),
+                                )
+                            )
+                        )
                 else:
-                    fig.add(T.figcaption("No data"))
+                    all_div.add(T.figcaption("No data"))
         return all_div
 
     # Tabulate latency graphs by testname sections with row per suite
@@ -832,6 +894,15 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 border: none;
                 color: white;
             }
+            .drill-down-row {
+               flex-flow: nowrap;
+            }
+            .drill-down {
+                min-width: 23rem;
+            }
+            .bar-chart {
+                width: 25rem;
+            }
             """
         )
     with doc:
@@ -861,7 +932,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     klass="pure-menu-item",
                 )
                 T.li(
-                    T.a("Latency", href="#latency", klass="pure-menu-link"),
+                    T.a("Details", href="#latency", klass="pure-menu-link"),
                     klass="pure-menu-item",
                 )
 
