@@ -15,6 +15,7 @@ import click
 import dominate
 import dominate.tags as T
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import numpy as np
 import rich
 from rich import print as pprint
@@ -501,11 +502,27 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     suites = [db.get_testrun_details(suite_id) for suite_id in suite_ids]
     # TODO check that same suites were run
 
+    standard_font = FontProperties(["Noto Sans", "Noto Emoji"])
+    plt.rcParams["font.family"] = standard_font.get_family()
+
     baseline_tests = db.get_test_runs(baseline_suite)
     suite_tests = [db.get_test_runs(suite_id) for suite_id in suite_ids]
 
     all_test_names = list({name for test in suite_tests for name in test.keys()})
     all_test_names.sort()
+    test_name_to_desc = {
+        test_name: next(
+            (
+                tests_of_suite[test_name]["description"]
+                for tests_of_suite in suite_tests
+                if test_name in tests_of_suite
+                and tests_of_suite[test_name]["description"]
+            ),
+            "?",
+        )
+        for test_name in all_test_names
+    }
+    print(test_name_to_desc)
 
     def fail_table():
         failed_tests = [
@@ -516,7 +533,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         ]
         div = T.div()
         if failed_tests:
-            table = div.add(T.table())
+            table = div.add(T.table(klass="pure-table pure-table-striped"))
             thead = table.add(T.thead())
             with thead.add(T.tr()):
                 T.th("Testrun")
@@ -562,13 +579,13 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     )
                 )
 
-            labels = []
+            bw_labels = []
             if show_baseline_test_name_re.search(test_name):
                 bw_rep_ids = rep_ids
-                labels = ["FIO Baseline"]
+                bw_labels = ["FIO Baseline"]
             else:
                 bw_rep_ids = rep_ids[1:]
-            labels.extend([f"{suite['human-id']}" for suite in suites])
+            bw_labels.extend([f"{suite['human-id']}" for suite in suites])
 
             bw = db.get_normalized_results("bw-mean", bw_rep_ids)
             bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
@@ -576,11 +593,11 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             ]
 
             div = all_div.add(T.div(style="display: flex; flex-wrap: wrap;"))
-            fig = div.add(T.figure(style="width: 25rem;"))
+            fig = div.add(T.figure(klass="pure-img", style="width: 25rem;"))
             fig.add(T.figcaption("Throughput"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
-                    labels,
+                    bw_labels,
                     [bw_read, bw_write],
                     ["read/GET", "write/PUT"],
                     "Throughput [MB/s]",
@@ -588,6 +605,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             )
 
             # note: skips baseline, fio iops not comparable with S3 ops
+            ops_labels = [f"{suite['human-id']}" for suite in suites]
             ops = db.get_normalized_results("iops-mean", rep_ids[1:])
 
             ops_ordered = [
@@ -597,13 +615,13 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 ops.get("list-iops-mean", float("nan")),
                 ops.get("stat-iops-mean", float("nan")),
             ]
-            ops_labels = ["GET", "PUT", "DELETE", "LIST", "STAT"]
+            ops_legend = ["GET", "PUT", "DELETE", "LIST", "STAT"]
 
-            fig = div.add(T.figure(style="width: 25rem;"))
+            fig = div.add(T.figure(klass="pure-img", style="width: 25rem;"))
             fig.add(T.figcaption("Operations"))
             fig.add_raw_string(
                 make_comparison_bargraph_svg(
-                    labels[1:], ops_ordered, ops_labels, "Ops [1/s]"
+                    ops_labels, ops_ordered, ops_legend, "Ops [1/s]"
                 )
             )
         return all_div
@@ -613,7 +631,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         div = T.div()
         div.add(T.h3(f"{a['human-id']} ➙ {b['human-id']}"))
         div.add(T.p(f"{a['description']} ➙ {b['description']}"))
-        table = div.add(T.table())
+        table = div.add(T.table(klass="pure-table pure-table-striped"))
         thead = table.add(T.thead())
 
         def add_headline(headlines):
@@ -663,6 +681,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     continue
                 fig = all_div.add(
                     T.figure(
+                        klass="pure-img",
                         style="width: 20rem;",
                         title=(
                             "Request duration percentiles in milliseconds,"
@@ -751,7 +770,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             else:
                 return str(thing[0])
 
-        table = div.add(T.table())
+        table = div.add(T.table(klass="pure-table pure-table-striped"))
         tbody = table.add(T.body())
         for k, vs in sorted(combined.items(), key=sort_key_fn):
             with tbody.add(T.tr()):
@@ -770,23 +789,95 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         return div
 
     # Assemble report
-    doc = dominate.document(title="S3GW Performance Report", lang="en")
+    human_ids = [suite["human-id"] for suite in suites]
+    suite_name = next((suite["name"] for suite in suites), "?")
+    title = f"S3GWperf: {'↣'.join(human_ids)} ({suite_name})"
+    doc = dominate.document(title=title, lang="en")
     with doc.head:
         T.meta(http_equiv="Content-Type", content="text/html; charset=utf-8")
-    with doc:
-        T.div(T.h1("S3GW Performance Report"), bar_graphs())
-
-        T.div(T.h2("Test Failures"), fail_table())
-
-        T.div(
-            T.h2("Comparison Tables"),
-            T.p("> 1 faster, = 1 no change, < 1 slower, > 1.3x 😎"),
-            (comparision_table(a, b) for a, b in itertools.combinations(suites, 2)),
+        with open(SCRIPT_PATH / "pure-min.css") as fd:
+            T.style(fd.read())
+        T.meta(name="viewport", content="width=device-width, initial-scale=1")
+        T.style(
+            """
+            html {
+                scroll-padding-top: 4em;
+            }
+            body {
+                font-family: Noto Sans, sans-serif;
+                line-height: 1.7em;
+                font-size: 13px;
+            }
+            .report-menu {
+                text-align: center;
+                background: #2d3e50;
+                padding: 0.5em;
+                color: white;
+                font-size: 120%;
+                font-weight: 400;
+            }
+            .report-menu ul {
+                float: right;
+            }
+            .content-wrapper {
+                padding: 1em 1em 3em;
+                margin-top: 4em;
+            }
+            .report-menu a {
+                color: white;
+            }
+            .report-menu li a:hover,
+            .report-menu li a:focus {
+                background: none;
+                border: none;
+                color: white;
+            }
+            """
         )
+    with doc:
+        with T.div(klass="header"), T.div(
+            klass="pure-menu report-menu pure-menu-horizontal pure-menu-fixed"
+        ):
+            T.a(title, href="#", klass="pure-menu-heading report-menu-brand")
+            with T.ul(klass="pure-menu-list"):
+                T.li(
+                    T.a(
+                        "Throughput / IOPS",
+                        href="#bargraphs",
+                        klass="pure-menu-link",
+                    ),
+                    klass="pure-menu-item",
+                )
+                T.li(
+                    T.a("Failures", href="#fail", klass="pure-menu-link"),
+                    klass="pure-menu-item",
+                )
+                T.li(
+                    T.a("Comparison", href="#comparison", klass="pure-menu-link"),
+                    klass="pure-menu-item",
+                )
+                T.li(
+                    T.a("Environment", href="#environment", klass="pure-menu-link"),
+                    klass="pure-menu-item",
+                )
+                T.li(
+                    T.a("Latency", href="#latency", klass="pure-menu-link"),
+                    klass="pure-menu-item",
+                )
 
-        T.div(T.h2("Test Environment"), env_table())
+        with T.div(klass="content-wrapper"):
+            T.div(T.h2("Throughput, OP Rate Comparison", id="bargraphs"), bar_graphs())
 
-        T.div(T.h2("Latency Graphs"), latency_table())
+            T.div(T.h2("Test Failures", id="fail"), fail_table())
+
+            T.div(
+                T.h2("Comparison Tables", id="comparison"),
+                (comparision_table(a, b) for a, b in itertools.combinations(suites, 2)),
+            )
+
+            T.div(T.h2("Test Environment", id="environment"), env_table())
+
+            T.div(T.h2("Latency Graphs", id="latency"), latency_table())
 
     with open(out, "wb") as fd:
         fd.write(doc.render().encode("utf-8"))
