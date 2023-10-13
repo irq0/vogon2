@@ -502,7 +502,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     suites = [db.get_testrun_details(suite_id) for suite_id in suite_ids]
     # TODO check that same suites were run
 
-    standard_font = FontProperties(["Noto Sans", "Noto Emoji"])
+    standard_font = FontProperties(["Noto Sans", "Symbola"])
     plt.rcParams["font.family"] = standard_font.get_family()
 
     baseline_tests = db.get_test_runs(baseline_suite)
