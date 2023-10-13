@@ -511,7 +511,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             (t[test_name], suites[i])
             for i, t in enumerate(suite_tests)
             for test_name in all_test_names
-            if not t[test_name]["success"]
+            if test_name in t and not t[test_name]["success"]
         ]
         div = T.div()
         if failed_tests:
