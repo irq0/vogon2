@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import collections
 import io
+import re
 import itertools
 import json
 import logging
@@ -536,6 +537,7 @@ def fancy(ctx, baseline_suite, out, suite_ids):
         baseline = baseline_tests[
             "FIO(job_file=/home/vogon/vogon2/fio/fio-rand-RW.fio)"
         ]
+        show_baseline_test_name_re = re.compile(r"workload=(put|get)")
         for test_name in all_test_names:
             all_div.add(T.h3(test_name))
             try:
@@ -560,9 +562,15 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                     )
                 )
 
-            labels = ["FIO Baseline"] + [f"{suite['human-id']}" for suite in suites]
+            labels = []
+            if show_baseline_test_name_re.search(test_name):
+                bw_rep_ids = rep_ids
+                labels = ["FIO Baseline"]
+            else:
+                bw_rep_ids = rep_ids[1:]
+            labels.extend([f"{suite['human-id']}" for suite in suites])
 
-            bw = db.get_normalized_results("bw-mean", rep_ids)
+            bw = db.get_normalized_results("bw-mean", bw_rep_ids)
             bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
                 x / 1024**2 for x in bw["write-bw-mean"]
             ]
