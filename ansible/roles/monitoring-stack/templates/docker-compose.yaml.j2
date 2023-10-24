@@ -1,6 +1,15 @@
 ---
 version: '3'
 services:
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - '127.0.0.1:3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - /etc/docker-compose/monitoring-stack/loki-config.yaml:/etc/loki/local-config.yaml:ro
+    restart: unless-stopped
+
   prom:
     image: prom/prometheus:latest
     ports:
@@ -22,13 +31,45 @@ services:
     image: grafana/grafana-oss:latest
     links:
       - prom
+      - loki
     ports:
       - '127.0.0.1:3000:3000'
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
-      GF_AUTH_ANONYMOUS_ORG_NAME: 's3gw'
       GF_SECURITY_ADMIN_USER: 'admin'
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_SECURITY_ADMIN_PASSWORD: 'admin'
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: false
+          version: 1
+          editable: false
+        - name: Prometheus
+          type: prometheus
+          orgId: 1
+          access: proxy
+          url: http://prom:8080
+          basicAuth: false
+          isDefault: false
+          editable: false
+          jsonData:
+            httpMethod: POST
+            prometheusType: Prometheus
+        EOF
+        /run.sh
     volumes:
       - grafana-storage:/var/lib/grafana:rw
     restart: unless-stopped

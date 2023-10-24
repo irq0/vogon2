@@ -72,6 +72,14 @@
         name: docker
         enabled: true
         masked: false
+    - name: have loki plugin?
+      command: docker plugin inspect loki
+      register: docker_loki_result
+      ignore_errors: True
+
+    - name: install loki logging plugin
+      command: docker plugin install grafana/loki-docker-driver:2.9.1 --alias loki --grant-all-permissions
+      when: docker_loki_result.rc != 0
 
 - name: podman
   when: container_runtime == 'podman'

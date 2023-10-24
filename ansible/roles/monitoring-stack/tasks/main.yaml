@@ -29,6 +29,14 @@
   notify:
     - reload prom config
 
+- name: loki config
+  template:
+    src: loki-config.yaml.j2
+    dest: /etc/docker-compose/monitoring-stack/loki-config.yaml
+    mode: "0644"
+  notify:
+    - reload prom config
+
 - name: enable compose service
   ansible.builtin.systemd:
     state: started
