@@ -101,6 +101,39 @@ def guess_free_host_port():
         return port
 
 
+def make_radosgw_command(id: str, port: int):
+    return [
+        "-d",
+        "--no-mon-config",
+        "--id",
+        id,
+        "--run-dir",
+        "/run/",
+        "--rgw-sfs-data-path",
+        "/data",
+        "--rgw-s3gw-enable-telemetry",
+        "0",
+        "--rgw-backend-store",
+        "sfs",
+        "--rgw-enable-ops-log",
+        "0",
+        "--rgw-log-object-name",
+        "0",
+        "--log-flush-on-exit",
+        "1",
+        "--log-to-stderr",
+        "1",
+        "--err-to-stderr",
+        "1",
+        "--log-max-recent",
+        "1",
+        "--debug-rgw",
+        "10",
+        "--rgw-frontends",
+        f"beast port={port}, status bind=0.0.0.0 port=9090",
+    ]
+
+
 class S3GW(ContainerManager):
     def __init__(
         self,
@@ -127,20 +160,8 @@ class S3GW(ContainerManager):
                     "mode": "rw",
                 }
             },
-            command=[
-                "--rgw-backend-store",
-                "sfs",
-                "--rgw-s3gw-enable-telemetry",
-                "0",
-                "--rgw-enable-ops-log",
-                "0",
-                "--rgw-log-object-name",
-                "0",
-                "--debug-rgw",
-                "1",
-                "--rgw-frontends",
-                f"beast port={self.port}, status bind=0.0.0.0 port=9090",
-            ],
+            entrypoint=["radosgw"],
+            command=make_radosgw_command("vogon_s3gw", self.port),
         )
         ret, version = self.container.exec_run(["radosgw", "--version"])
         if ret == 0:
