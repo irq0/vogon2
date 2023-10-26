@@ -145,6 +145,7 @@ class S3GW(ContainerManager):
         self.storage = storage
         self.s3gw_version = "unknown"
         self.port = guess_free_host_port()
+        self.command = make_radosgw_command("vogon_s3gw", self.port)
         super().__init__(cri, image, pull_image)
 
     def run(self, **args):
@@ -161,7 +162,7 @@ class S3GW(ContainerManager):
                 }
             },
             entrypoint=["radosgw"],
-            command=make_radosgw_command("vogon_s3gw", self.port),
+            command=self.command,
         )
         ret, version = self.container.exec_run(["radosgw", "--version"])
         if ret == 0:
@@ -173,6 +174,7 @@ class S3GW(ContainerManager):
     def env(self):
         e = super().env()
         e["s3gw-version"] = self.s3gw_version
+        e["s3gw-radosgw-command"] = " ".join(self.command)
         return e
 
     def up(self):
