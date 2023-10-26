@@ -128,7 +128,7 @@ def make_radosgw_command(id: str, port: int):
         "--log-max-recent",
         "1",
         "--debug-rgw",
-        "10",
+        "1",
         "--rgw-frontends",
         f"beast port={port}, status bind=0.0.0.0 port=9090",
     ]
