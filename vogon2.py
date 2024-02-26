@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false
+from __future__ import annotations
+
 import json
 import logging
 import pathlib
@@ -70,14 +74,16 @@ class ContainerManager:
             "image-tags": ";".join(self.image.tags),
         }
 
-    def network_address(self):
-        for retry in range(5):
-            addr = self.container.attrs["NetworkSettings"]["IPAddress"]
+    def network_address(self) -> str:
+        retry = 0
+        while retry < 5:
+            addr: str = self.container.attrs["NetworkSettings"]["IPAddress"]
             if addr == "":
                 return "localhost"
             elif addr:
                 return addr
-            time.sleep(2 * (retry + 1))
+            retry += 1
+            time.sleep(2 * retry)
             self.container.reload()
         raise RuntimeError(
             f"Container has no network address after {retry} tries. "
@@ -85,20 +91,24 @@ class ContainerManager:
             "Check container logs."
         )
 
-    def endpoint(self):
+    def endpoint(self) -> str:
         return ""
+
+    def credentials(self) -> tuple[str, str]:
+        return "", ""
 
     def up(self):
         return self.container is not None
 
 
-def guess_free_host_port():
+def guess_free_host_port() -> int | None:
     for randport_fn in itertools.repeat(lambda: random.randrange(10000, 20000)):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(("", randport_fn()))
-        port = sock.getsockname()[1]
+        port: int = sock.getsockname()[1]
         sock.close()
         return port
+    return None
 
 
 def make_radosgw_command(id: str, port: int):
@@ -135,16 +145,21 @@ def make_radosgw_command(id: str, port: int):
 
 
 class S3GW(ContainerManager):
+    port: int
+
     def __init__(
         self,
         cri: docker.DockerClient,
         image: DockerImageType,
         pull_image: bool,
-        storage: "Storage",
+        storage: Storage,
     ):
         self.storage = storage
         self.s3gw_version = "unknown"
-        self.port = guess_free_host_port()
+        port = guess_free_host_port()
+        if port is None:
+            raise Exception("unable to find available port")
+        self.port = port
         self.command = make_radosgw_command("vogon_s3gw", self.port)
         super().__init__(cri, image, pull_image)
 
@@ -184,8 +199,93 @@ class S3GW(ContainerManager):
         except requests.exceptions.ConnectionError:
             return False
 
-    def endpoint(self):
+    def endpoint(self) -> str:
         return f"{self.network_address()}:{self.port}"
+
+    def credentials(self) -> tuple[str, str]:
+        return "test", "test"
+
+
+def get_minio_version(cri: docker.DockerClient, img: str) -> str:
+    res: None | bytes = cri.containers.run(
+        img,
+        command=["--version"],
+        detach=False,
+        stdout=True,
+        stderr=True,
+    )
+    if res is None:
+        LOG.error("unable to obtain minio version")
+        raise Exception()
+    lines = bytes(res).decode().splitlines()
+    if len(lines) < 1:
+        LOG.error("unable to obtain minio version")
+        raise Exception()
+    return lines[0]
+
+
+class Minio(ContainerManager):
+    port: int
+    version: str
+    storage: Storage
+    container: Any
+
+    def __init__(
+        self,
+        cri: docker.DockerClient,
+        image: DockerImageType,
+        pull_image: bool,
+        storage: Storage,
+    ):
+        self.storage = storage
+        self.version = "unknown"
+        port = guess_free_host_port()
+        if port is None:
+            raise Exception("unable to find available port")
+        self.port = port
+        self.command = ["server", "/data"]
+        super().__init__(cri, image, pull_image)
+
+    def run(self, **args: dict[str, Any]):
+        LOG.debug("Starting minio container")
+        self.version = get_minio_version(self.cri, self.image.id)
+        LOG.debug(f"Using minio version: {self.version}")
+
+        self.container = self.cri.containers.run(
+            self.image.id,
+            detach=True,
+            **args,
+            labels=["vogon_minio"],
+            ports={"9000/tcp": self.port},
+            volumes={
+                self.storage.mountpoint: {
+                    "bind": "/data",
+                    "mode": "rw",
+                }
+            },
+            command=self.command,
+        )
+        return self.container
+
+    def env(self):
+        e = super().env()
+        e["minio-version"] = self.version
+        e["minio-command"] = " ".join(self.command)
+        return e
+
+    def up(self):
+        try:
+            requests.head(f"http://{self.endpoint()}")
+            # if we are able to connect, then it's probably okay.
+            return True
+        except requests.exceptions.ConnectionError:
+            return False
+
+    def endpoint(self) -> str:
+        return f"{self.network_address()}:{self.port}"
+
+    def credentials(self) -> tuple[str, str]:
+        return "minioadmin", "minioadmin"
 
 
 class Storage:
@@ -382,15 +482,15 @@ class Test:
     def __init__(self, description: str):
         self._description = description
 
-    def env(self, instance: "TestRunner") -> results_db.TestEnvType:
+    def env(self, instance: TestRunner) -> results_db.TestEnvType:
         "Return environment data. e.g test tool version"
         raise NotImplementedError
 
-    def results(self, instance: "TestRunner") -> results_db.TestResultsType:
+    def results(self, instance: TestRunner) -> results_db.TestResultsType:
         "Return test run results"
         raise NotImplementedError
 
-    def run(self, instance: "TestRunner") -> int:
+    def run(self, instance: TestRunner) -> int:
         "Run test to completion"
         raise NotImplementedError
 
@@ -415,14 +515,14 @@ class ContainerizedTest(Test):
         self.container_image = container_image
         super().__init__(description)
 
-    def run(self, instance: "TestRunner"):
+    def run(self, instance: TestRunner):
         container_manager = ContainerManager(instance.cri, self.container_image)
         return container_manager.run()
 
-    def env(self, instance: "TestRunner"):
+    def env(self, instance: TestRunner):
         raise NotImplementedError
 
-    def results(self, instance: "TestRunner"):
+    def results(self, instance: TestRunner):
         raise NotImplementedError
 
     @classmethod
@@ -437,13 +537,13 @@ class HostTest(Test):
     def __init__(self, name):
         super().__init__(name)
 
-    def run(self, instance: "TestRunner"):
+    def run(self, instance: TestRunner):
         raise NotImplementedError
 
-    def env(self, instance: "TestRunner"):
+    def env(self, instance: TestRunner):
         raise NotImplementedError
 
-    def results(self, instance: "TestRunner") -> results_db.TestResultsType:
+    def results(self, instance: TestRunner) -> results_db.TestResultsType:
         raise NotImplementedError
 
     @classmethod
@@ -459,7 +559,7 @@ class FIOTest(HostTest):
         self.job_file = job_file
         super().__init__(name)
 
-    def run(self, instance: "TestRunner"):
+    def run(self, instance: TestRunner):
         try:
             LOG.info(
                 "running fio with job file %s in %s",
@@ -484,7 +584,7 @@ class FIOTest(HostTest):
 
         return 0
 
-    def env(self, instance: "TestRunner"):
+    def env(self, instance: TestRunner):
         with open(self.job_file) as fd:
             jobfile = fd.read()
         return {
@@ -492,7 +592,7 @@ class FIOTest(HostTest):
             "fio-jobfile": jobfile,
         }
 
-    def results(self, instance: "TestRunner"):
+    def results(self, instance: TestRunner):
         result = [
             ("JSON", json.dumps(self.data), "JSON"),
         ]
@@ -522,8 +622,6 @@ class WarpTest(ContainerizedTest):
     default_container_image = "minio/warp"
     default_args = ["--no-color"]
     default_workload_args = [
-        "--access-key=test",
-        "--secret-key=test",
         "--noclear",  # vogon restarts and runs mkfs between runs
         "--benchdata=/warp.out",
     ]
@@ -545,20 +643,23 @@ class WarpTest(ContainerizedTest):
             self.args = args
         self.raw_results: str = ""
         self.warp_version: str = "unknown"
-        self.json_results: dict = {}
+        self.json_results: dict[str, Any] = {}
 
-    def make_args(self, endpoint):
-        args = []
+    def make_args(self, endpoint: str, access_key: str, secret_key: str) -> list[str]:
+        args: list[str] = []
         args.extend(self.default_args)
         args.append(self.workload)
         args.extend(self.default_workload_args)
+        args.extend([f"--access-key={access_key}", f"--secret-key={secret_key}"])
         args.append(f"--host={endpoint}")
         args.extend(self.args)
         return args
 
-    def run(self, instance: "TestRunner"):
+    def run(self, instance: TestRunner):
         self.container = ContainerManager(instance.cri, self.container_image)
-        args = self.make_args(instance.under_test_container.endpoint())
+        endpoint = instance.under_test_container.endpoint()
+        access_key, secret_key = instance.under_test_container.credentials()
+        args = self.make_args(endpoint, access_key, secret_key)
         LOG.info("🔎 Warp args: %s", args)
         running = self.container.run(
             command=args,
@@ -649,7 +750,7 @@ class WarpTest(ContainerizedTest):
 
         return result["StatusCode"]
 
-    def results(self, instance: "TestRunner"):
+    def results(self, instance: TestRunner):
         results = []
         if not self.last_run:
             return None
@@ -676,7 +777,7 @@ class WarpTest(ContainerizedTest):
             )
         return results
 
-    def env(self, instance: "TestRunner"):
+    def env(self, instance: TestRunner):
         env = self.container.env()
         env["warp-version"] = self.warp_version
         env[self.description + "-args"] = " ".join(self.args)
@@ -1309,6 +1410,13 @@ def cli(ctx, debug):
     help="Pull under test image?",
 )
 @click.option(
+    "--backend",
+    envvar="VOGON_BACKEND",
+    type=click.Choice(["s3gw", "minio"]),
+    required=False,
+    default="s3gw",
+)
+@click.option(
     "--suite",
     type=click.Choice(list(test_suites_indexed.keys())),
     envvar="VOGON_SUITE",
@@ -1413,19 +1521,20 @@ def cli(ctx, debug):
     help="How many repetitions to run",
 )
 def test(
-    ctx,
-    under_test_image,
-    under_test_image_pull,
-    suite,
-    archive_dir,
-    storage_device,
-    storage_partition,
-    mountpoint,
-    mkfs,
-    docker_api,
-    sqlite,
-    reset_storage,
-    repeat,
+    ctx: dict[str, Any],
+    under_test_image: str,
+    under_test_image_pull: bool,
+    backend: str,
+    suite: str,
+    archive_dir: pathlib.Path,
+    storage_device: pathlib.Path,
+    storage_partition: pathlib.Path,
+    mountpoint: pathlib.Path,
+    mkfs: str,
+    docker_api: str,
+    sqlite: str,
+    reset_storage: bool,
+    repeat: int,
 ):
     cri = docker.DockerClient(base_url=docker_api)
     dbconn = sqlite3.connect(sqlite)
@@ -1437,12 +1546,20 @@ def test(
     storage = Storage(
         reset_storage, storage_device, storage_partition, mountpoint, mkfs.split()
     )
-    s3gw = S3GW(cri, under_test_image, under_test_image_pull, storage)
-    test_runner = TestRunner(cri, db, s3gw, storage, archive_dir, repeat)
+    mgr: ContainerManager | None = None
+    if backend == "s3gw":
+        mgr = S3GW(cri, under_test_image, under_test_image_pull, storage)
+    elif backend == "minio":
+        mgr = Minio(cri, under_test_image, under_test_image_pull, storage)
+
+    if mgr is None:
+        raise Exception("unexpected backend")
+
+    test_runner = TestRunner(cri, db, mgr, storage, archive_dir, repeat)
     try:
         test_runner.run_suite(test_suites_indexed[suite])
     finally:
-        s3gw.terminate()
+        mgr.terminate()
         dbconn.close()
 
 
