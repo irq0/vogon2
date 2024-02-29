@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 import collections
+import contextlib
 import io
-import re
 import itertools
 import json
 import logging
+import os
 import pathlib
+import re
 import sqlite3
-import contextlib
 from contextlib import closing
 
-import docker
 import click
+import docker
 import dominate
 import dominate.tags as T
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
 import numpy as np
 import rich
+from matplotlib.font_manager import FontProperties
 from rich import print as pprint
 from rich.console import Console
 from rich.table import Table
@@ -554,9 +555,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
     def bar_graphs():
         all_div = T.div()
-        baseline = baseline_tests[
-            "FIO(job_file=/home/vogon/vogon2/fio/fio-rand-RW.fio)"
-        ]
+        basepath = os.path.dirname(os.path.realpath(__file__))
+        jobpath = f"{basepath}/fio/fio-rand-RW.fio"
+        baseline = baseline_tests[f"FIO(job_file={jobpath})"]
         show_baseline_test_name_re = re.compile(r"workload=(put|get)")
         for test_name in all_test_names:
             all_div.add(T.h3(test_name))
@@ -906,8 +907,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             """
         )
     with doc:
-        with T.div(klass="header"), T.div(
-            klass="pure-menu report-menu pure-menu-horizontal pure-menu-fixed"
+        with (
+            T.div(klass="header"),
+            T.div(klass="pure-menu report-menu pure-menu-horizontal pure-menu-fixed"),
         ):
             T.a(title, href="#", klass="pure-menu-heading report-menu-brand")
             with T.ul(klass="pure-menu-list"):
