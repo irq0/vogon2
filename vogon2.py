@@ -3,21 +3,24 @@
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false
 from __future__ import annotations
 
+import grp
+import itertools
 import json
 import logging
+import os
 import pathlib
+import pwd
+import random
+import socket
 import sqlite3
 import subprocess
 import tarfile
-import requests
-import itertools
-import random
-import socket
 import time
 from typing import Any
 
 import click
 import docker
+import requests
 from rich.logging import RichHandler
 
 import report
@@ -28,6 +31,12 @@ LOG = logging.getLogger("vogon")
 
 
 DockerImageType = str
+
+
+def get_user_and_group() -> tuple[str, str]:
+    user = pwd.getpwuid(os.getuid())
+    group = grp.getgrgid(os.getgid())
+    return user.pw_name, group.gr_name
 
 
 class ContainerManager:
@@ -427,8 +436,9 @@ class Storage:
             )
             LOG.debug("mount out: %s", mount_out)
 
+            user, group = get_user_and_group()
             chown_out = subprocess.check_output(
-                ["sudo", "chown", "vogon:vogon", self.mountpoint],
+                ["sudo", "chown", f"{user}:{group}", self.mountpoint],
                 stderr=subprocess.STDOUT,
             )
             LOG.debug("chown out: %s", chown_out)
