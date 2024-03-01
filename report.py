@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 import collections
+import contextlib
 import io
-import re
 import itertools
 import json
 import logging
+import os
 import pathlib
+import re
 import sqlite3
-import contextlib
 from contextlib import closing
+from typing import cast
 
-import docker
 import click
+import docker
 import dominate
 import dominate.tags as T
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
 import numpy as np
 import rich
+from matplotlib.font_manager import FontProperties
 from rich import print as pprint
 from rich.console import Console
 from rich.table import Table
 
 import results_db
+from results_db import TestRunDetailsType
 
 SCRIPT_PATH = pathlib.Path(__file__).parent
 LOG = logging.getLogger("vogon-report")
@@ -498,11 +501,39 @@ def compare(ctx, suite_a, suite_b):
     ),
     required=True,
 )
-@click.argument("suite-ids", nargs=-1)
-def fancy(ctx, baseline_suite, out, suite_ids):
-    "Results comparison table"
-    db = ctx.obj["db"]
-    suites = [db.get_testrun_details(suite_id) for suite_id in suite_ids]
+@click.argument("suite-entries", nargs=-1, type=str)
+def fancy(ctx, baseline_suite, out: pathlib.Path, suite_entries: list[str]):
+    """Results comparison table
+
+    \b
+    SUITE_ENTRIES refer to suite IDs in the format [NAME=]ID, where an optional
+    name for the ID being provided. If NAME is not provided, a human readable
+    label will be generated.
+
+
+    SUITE_ENTRIES must be comprised of at least two IDs.
+    """
+    db: results_db.ResultsDB = cast(results_db.ResultsDB, ctx.obj["db"])
+
+    suites: list[TestRunDetailsType] = []
+    suite_ids: list[str] = []
+    suite_names: list[str] = []
+
+    for suite in suite_entries:
+        sid: str
+        sn: str | None = None
+        if "=" in suite:
+            sn, sid = suite.split("=", 1)
+        else:
+            sid = suite
+        s = db.get_testrun_details(sid)
+        if sn is not None:
+            suite_names.append(sn)
+        else:
+            suite_names.append(s["human-id"])
+        suites.append(s)
+        suite_ids.append(sid)
+
     # TODO check that same suites were run
 
     standard_font = FontProperties(["Noto Sans", "Symbola"])
@@ -513,19 +544,6 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
     all_test_names = list({name for test in suite_tests for name in test.keys()})
     all_test_names.sort()
-    test_name_to_desc = {
-        test_name: next(
-            (
-                tests_of_suite[test_name]["description"]
-                for tests_of_suite in suite_tests
-                if test_name in tests_of_suite
-                and tests_of_suite[test_name]["description"]
-            ),
-            "?",
-        )
-        for test_name in all_test_names
-    }
-    print(test_name_to_desc)
 
     def fail_table():
         failed_tests = [
@@ -554,10 +572,10 @@ def fancy(ctx, baseline_suite, out, suite_ids):
     # Bar Graphs: Throughput MB/s and Ops/s for each test in suite
     def bar_graphs():
         all_div = T.div()
-        baseline = baseline_tests[
-            "FIO(job_file=/home/vogon/vogon2/fio/fio-rand-RW.fio)"
-        ]
-        show_baseline_test_name_re = re.compile(r"workload=(put|get)")
+        basepath = os.path.dirname(os.path.realpath(__file__))
+        jobpath = f"{basepath}/fio/fio-rand-RW.fio"
+        baseline = baseline_tests[f"FIO(job_file={jobpath})"]
+        show_baseline_test_name_re = re.compile(r"workload=(put|get|mixed)")
         for test_name in all_test_names:
             all_div.add(T.h3(test_name))
             try:
@@ -588,7 +606,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
                 bw_labels = ["FIO Baseline"]
             else:
                 bw_rep_ids = rep_ids[1:]
-            bw_labels.extend([f"{suite['human-id']}" for suite in suites])
+
+            # bw_labels.extend([f"{suite['human-id']}" for suite in suites])
+            bw_labels.extend(suite_names)
 
             bw = db.get_normalized_results("bw-mean", bw_rep_ids)
             bw_read, bw_write = [x / 1024**2 for x in bw["read-bw-mean"]], [
@@ -608,7 +628,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             )
 
             # note: skips baseline, fio iops not comparable with S3 ops
-            ops_labels = [f"{suite['human-id']}" for suite in suites]
+            # ops_labels = [f"{suite['human-id']}" for suite in suites]
+            ops_labels = suite_names
             ops = db.get_normalized_results("iops-mean", rep_ids[1:])
 
             ops_ordered = [
@@ -906,8 +927,9 @@ def fancy(ctx, baseline_suite, out, suite_ids):
             """
         )
     with doc:
-        with T.div(klass="header"), T.div(
-            klass="pure-menu report-menu pure-menu-horizontal pure-menu-fixed"
+        with (
+            T.div(klass="header"),
+            T.div(klass="pure-menu report-menu pure-menu-horizontal pure-menu-fixed"),
         ):
             T.a(title, href="#", klass="pure-menu-heading report-menu-brand")
             with T.ul(klass="pure-menu-list"):
@@ -950,7 +972,8 @@ def fancy(ctx, baseline_suite, out, suite_ids):
 
             T.div(T.h2("Latency Graphs", id="latency"), latency_table())
 
-    with open(out, "wb") as fd:
+    out_fn = out.with_suffix(".html")
+    with open(out_fn, "wb") as fd:  # type: ignore
         fd.write(doc.render().encode("utf-8"))
 
     print("done")

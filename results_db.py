@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import platform
-import sqlite3
 import re
+import sqlite3
 import typing
 import uuid
 from contextlib import closing
@@ -12,6 +12,7 @@ IDType = str
 TestResultType = tuple[str, str, str]
 TestResultsType = list[TestResultType]
 TestEnvType = dict[str, typing.Any]
+TestRunDetailsType = dict[str, str]
 
 
 class ResultsDB:
@@ -290,7 +291,7 @@ class ResultsDB:
 
         return result
 
-    def get_testrun_details(self, suite_id: IDType) -> dict[str, str]:
+    def get_testrun_details(self, suite_id: IDType) -> TestRunDetailsType:
         "Return testrun details (names, selected environment data) as key value dict"
         results = {}
         with closing(self.db.cursor()) as cur:
@@ -396,6 +397,12 @@ class ResultsDB:
             results["url"] = (
                 f"https://github.com/aquarist-labs" f"/ceph/actions/runs/{m.group(1)}"
             )
+        elif m := re.search(r"((.*\/)?(\w+)):(.*)", results["under-test-image-tags"]):
+            results["human-id"] = f"{m.group(3)} @ {m.group(4)}"
+            if m.group(2) is not None:
+                results["url"] = f"https://{m.group(1)}"
+            else:
+                results["url"] = ""
         else:
             results["human-id"] = "?"
             results["url"] = ""
