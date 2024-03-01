@@ -502,7 +502,7 @@ def compare(ctx, suite_a, suite_b):
     required=True,
 )
 @click.argument("suite-entries", nargs=-1, type=str)
-def fancy(ctx, baseline_suite, out, suite_entries: list[str]):
+def fancy(ctx, baseline_suite, out: pathlib.Path, suite_entries: list[str]):
     """Results comparison table
 
     \b
@@ -972,7 +972,8 @@ def fancy(ctx, baseline_suite, out, suite_entries: list[str]):
 
             T.div(T.h2("Latency Graphs", id="latency"), latency_table())
 
-    with open(out, "wb") as fd:  # type: ignore
+    out_fn = out.with_suffix(".html")
+    with open(out_fn, "wb") as fd:  # type: ignore
         fd.write(doc.render().encode("utf-8"))
 
     print("done")
